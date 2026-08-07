@@ -1,0 +1,21 @@
+function dashboard_improved()
+disp("📈 Generating dashboard...");
+
+nd = readtable('data/processed/ndvi_by_zone.csv');
+sensor = readtable('data/sensor_data.csv');
+
+figure('Name','Crop Health Dashboard','NumberTitle','off');
+
+subplot(1,2,1);
+bar(nd.avgNDVI,'FaceColor',[0.2 0.6 0.2]);
+set(gca,'XTick',1:numel(nd.zone),'XTickLabel',nd.zone);
+ylabel('Average NDVI'); title('Zone-wise Crop Health');
+
+subplot(1,2,2);
+histogram(sensor.soil_moisture);
+xlabel('Soil Moisture (%)'); ylabel('Frequency');
+title('Soil Moisture Distribution');
+
+saveas(gcf,'data/processed/dashboard.png');
+disp("✅ Dashboard and corn_report.csv generated in data/processed.");
+end

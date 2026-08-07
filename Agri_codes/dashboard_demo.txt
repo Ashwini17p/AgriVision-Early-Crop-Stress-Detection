@@ -1,0 +1,101 @@
+function dashboard_demo()
+% -----------------------------------------------------------
+% SMART AGRICULTURE AI  |  Dashboard with health insights
+% -----------------------------------------------------------
+
+disp("📊 Building SmartFarm Dashboard with percentage labels ...");
+
+% --- Load processed data
+cornTable = readtable('data/corn_data.csv');
+sensorTbl = readtable('data/sensor_data.csv');
+
+% --- Compute NDVI & crop health
+cornTable.NDVI = (cornTable.NIR - cornTable.Red) ./ (cornTable.NIR + cornTable.Red);
+
+health = strings(size(cornTable.NDVI));
+recommendation = strings(size(cornTable.NDVI));
+
+for i = 1:length(cornTable.NDVI)
+    if cornTable.NDVI(i) > 0.6
+        health(i) = "Healthy";
+        recommendation(i) = "Maintain regular monitoring.";
+    elseif cornTable.NDVI(i) > 0.3
+        health(i) = "Stressed";
+        recommendation(i) = "Check irrigation and nutrient supply.";
+    else
+        health(i) = "Deficient";
+        recommendation(i) = "Inspect field for pests/disease. Apply corrective measures.";
+    end
+end
+
+cornTable.Health = health;
+cornTable.Recommendation = recommendation;
+
+% --- Save summary CSV
+if ~exist('data/processed','dir'); mkdir('data/processed'); end
+writetable(cornTable,'data/processed/corn_report.csv');
+
+% --- Zone health distribution (for visual map)
+rows = 14; cols = 21;
+healthMap = randi([1,3], rows, cols); % 1=Deficient,2=Stressed,3=Healthy
+
+figure('Name','SmartFarm Dashboard','NumberTitle','off','Position',[100 100 1200 700]);
+
+%% ---------------- Field Map ----------------
+subplot(2,3,1);
+imagesc(healthMap);
+title('Field Health Map');
+xlabel('Column'); ylabel('Row');
+colormap([1 0 0; 1 1 0; 0 1 0]); % red, yellow, green
+colorbar('Ticks',[1,2,3],'TickLabels',{'Deficient','Stressed','Healthy'});
+
+%% ---------------- Field Health Pie ----------------
+subplot(2,3,2);
+cats = categorical(cornTable.Health);
+counts = countcats(cats);
+total = sum(counts);
+perc = round((counts/total)*100,1);
+labels = strcat(categories(cats), " (", string(perc), "%)");
+pie(counts, labels);
+title('Field Health Distribution (%)');
+
+%% ---------------- Water Requirement Pie ----------------
+subplot(2,3,3);
+waterVals = [20 80];
+waterLabels = ["Medium (" + string(round(20/(20+80)*100,1)) + "%)", ...
+               "High (" + string(round(80/(20+80)*100,1)) + "%)"];
+pie(waterVals, waterLabels);
+title('Water Requirement Distribution (%)');
+
+%% ---------------- Pest Risk Pie ----------------
+subplot(2,3,4);
+pestVals = [10 90];
+pestLabels = ["Medium (" + string(round(10/(10+90)*100,1)) + "%)", ...
+              "High (" + string(round(90/(10+90)*100,1)) + "%)"];
+pie(pestVals, pestLabels);
+title('Pest Risk Distribution (%)');
+
+%% ---------------- Nutrition Requirement Pie ----------------
+subplot(2,3,5);
+nutVals = [15 85];
+nutLabels = ["Medium (" + string(round(15/(15+85)*100,1)) + "%)", ...
+             "High (" + string(round(85/(15+85)*100,1)) + "%)"];
+pie(nutVals, nutLabels);
+title('Nutrition Requirement Distribution (%)');
+
+%% ---------------- NDVI Comparison ----------------
+subplot(2,3,6);
+refNDVI = 0.6;
+bar([mean(cornTable.NDVI), refNDVI]);
+set(gca,'XTickLabel',{'Your Avg NDVI','Reference NDVI'});
+title('Average NDVI Comparison');
+ylabel('NDVI');
+deviation = abs(mean(cornTable.NDVI) - refNDVI);
+text(1.5, min([mean(cornTable.NDVI), refNDVI]) - 0.05, ...
+    ['Deviation = ' num2str(deviation,'%.3f')]);
+
+sgtitle('🌾 SmartFarm AI Dashboard — Crop Health, Risks & Requirements (%)');
+
+disp("✅ Dashboard displayed successfully with percentage labels.");
+disp("✅ Detailed report saved in data/processed/corn_report.csv");
+end

@@ -1,0 +1,70 @@
+function generate_recommendations()
+disp("🤖 Generating SmartFarm Recommendations...");
+
+% --- Load data
+ndviTbl = readtable('data/processed/ndvi_by_zone.csv');
+sensorTbl = readtable('data/sensor_data.csv');
+
+% --- Join both tables on 'zone'
+joined = innerjoin(sensorTbl, ndviTbl, 'Keys', 'zone');
+
+% --- Initialize output
+joined.Recommendation = strings(height(joined),1);
+joined.AlertLevel = strings(height(joined),1);
+
+% --- Rule-based recommendation generation
+for i = 1:height(joined)
+    ndvi = joined.avgNDVI(i);
+    soil = joined.soil_moisture(i);
+    temp = joined.temp(i);
+    hum  = joined.humidity(i);
+    leaf = joined.leaf_wetness(i);
+
+    rec = "";
+    alert = "";
+
+    % NDVI analysis
+    if ndvi < 0.3
+        rec = rec + "🌾 Severe vegetation stress detected. ";
+        alert = "CRITICAL";
+    elseif ndvi < 0.6
+        rec = rec + "⚠️ Mild stress observed. ";
+        alert = "WARNING";
+    else
+        rec = rec + "✅ Crop health normal. ";
+        alert = "OK";
+    end
+
+    % Soil moisture
+    if soil < 25
+        rec = rec + "💧 Soil dry — irrigate immediately. ";
+        if alert ~= "CRITICAL", alert = "WARNING"; end
+    elseif soil < 40
+        rec = rec + "💧 Soil moisture moderate — monitor levels. ";
+    end
+
+    % Temperature & humidity
+    if hum > 80 && temp > 25 && temp < 35
+        rec = rec + "🐛 High humidity and warmth — possible fungal pest risk. ";
+        alert = "WARNING";
+    end
+
+    % Leaf wetness
+    if leaf > 0.6
+        rec = rec + "🌿 Excess leaf wetness — possible dew-related disease. ";
+    end
+
+    joined.Recommendation(i) = rec;
+    joined.AlertLevel(i) = alert;
+end
+
+% --- Save recommendations
+if ~exist('data/processed','dir'); mkdir('data/processed'); end
+writetable(joined,'data/processed/recommendations.csv');
+disp("✅ Recommendations written to data/processed/recommendations.csv");
+
+% --- Summary Output
+disp("🧩 Recommendation Summary (first 5 rows):");
+disp(joined(1:min(5,height(joined)),{'zone','avgNDVI','soil_moisture','AlertLevel','Recommendation'}));
+
+end

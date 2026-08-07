@@ -1,0 +1,40 @@
+import sounddevice as sd
+import numpy as np
+import wavio
+from faster_whisper import WhisperModel
+
+# Load model
+model = WhisperModel("base", compute_type="float32")
+
+fs = 16000
+record_seconds = 6   # speak once within this time
+
+print("🎤 Speak now (you have 6 seconds)...")
+
+# Record once
+audio = sd.rec(
+    int(record_seconds * fs),
+    samplerate=fs,
+    channels=1,
+    dtype="float32"
+)
+sd.wait()
+
+print("🛑 Recording finished. Transcribing...")
+
+# Save audio
+wavio.write("speech.wav", audio.flatten(), fs, sampwidth=2)
+
+# Transcribe (English only)
+segments, info = model.transcribe(
+    "speech.wav",
+    language="en"
+)
+
+print("\n📝 You said:")
+for seg in segments:
+    text = seg.text.strip()
+    if text:
+        print(text)
+
+print("\n✅ Done. Program exited.")

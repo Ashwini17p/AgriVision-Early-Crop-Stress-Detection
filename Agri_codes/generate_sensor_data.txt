@@ -1,0 +1,23 @@
+function generate_sensor_data()
+disp("📡 Generating synthetic sensor_data.csv ...");
+rng(42);
+
+rows = 14; cols = 21;
+fid = fopen('data/sensor_data.csv', 'w');
+fprintf(fid, 'timestamp,row,col,soil_moisture,temp,humidity,leaf_wetness,zone\n');
+
+for r = 1:rows
+    for c = 1:cols
+        tstamp = datetime('now') - minutes(r*c);
+        zone = strcat('Zone-', string(ceil(c/7)));
+        soil = 20 + 20*rand();
+        temp = 25 + 5*rand();
+        hum = 50 + 20*rand();
+        leaf = 0.2 + 0.6*rand();
+        fprintf(fid, '%s,%d,%d,%.2f,%.2f,%.2f,%.2f,%s\n', ...
+           char(datetime(tstamp,'Format','yyyy-MM-dd HH:mm:ss')), r, c, soil, temp, hum, leaf, zone);
+    end
+end
+fclose(fid);
+disp("✅ sensor_data.csv generated with soil, weather & leaf sensors.");
+end

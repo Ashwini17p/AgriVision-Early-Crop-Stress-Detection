@@ -1,0 +1,23 @@
+import sounddevice as sd
+import wavio
+from faster_whisper import WhisperModel
+
+model = WhisperModel("base", compute_type="float32")
+
+fs = 16000
+duration = 5  # seconds
+
+while True:
+    print("Recording... Speak now!")
+    recording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
+    sd.wait()
+
+    wav_file = "mic_record.wav"
+    wavio.write(wav_file, recording, fs, sampwidth=2)
+
+    segments, info = model.transcribe(wav_file)
+
+    for segment in segments:
+        print("You said:", segment.text)
+
+    print("---- Next ----\n")

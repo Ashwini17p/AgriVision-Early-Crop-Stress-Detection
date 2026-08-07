@@ -1,0 +1,17 @@
+function process_ndvi_grid()
+disp("🧠 Processing NDVI grid...");
+T = readtable('data/corn_data.csv');
+T.NDVI = (T.NIR - T.Red) ./ (T.NIR + T.Red);
+
+zones = unique(T.zone);
+zoneMean = zeros(numel(zones),1);
+for i = 1:numel(zones)
+    zoneData = T(strcmp(T.zone, zones{i}), :);
+    zoneMean(i) = mean(zoneData.NDVI, 'omitnan');
+end
+
+ndviTbl = table(zones, zoneMean, 'VariableNames', {'zone','avgNDVI'});
+writetable(ndviTbl, 'data/processed/ndvi_by_zone.csv');
+save('data/processed/gridNDVI.mat','ndviTbl');
+disp("✅ NDVI processing complete. ndvi_by_zone.csv and gridNDVI.mat created.");
+end

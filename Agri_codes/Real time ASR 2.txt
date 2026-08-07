@@ -1,0 +1,43 @@
+import sounddevice as sd
+import numpy as np
+import wavio
+from faster_whisper import WhisperModel
+
+model = WhisperModel("base", compute_type="float32")
+
+fs = 16000
+chunk_duration = 1.0  # seconds (low latency)
+buffer_seconds = 4    # rolling window
+
+audio_buffer = []
+
+print("🎤 Listening... Speak naturally (Ctrl+C to stop)")
+
+while True:
+    chunk = sd.rec(
+        int(chunk_duration * fs),
+        samplerate=fs,
+        channels=1,
+        dtype="float32"
+    )
+    sd.wait()
+
+    audio_buffer.append(chunk.flatten())
+
+    # Keep buffer size limited
+    max_chunks = int(buffer_seconds / chunk_duration)
+    if len(audio_buffer) > max_chunks:
+        audio_buffer.pop(0)
+
+    audio = np.concatenate(audio_buffer)
+
+    wavio.write("live.wav", audio, fs, sampwidth=2)
+
+    segments, info = model.transcribe(
+        "live.wav",
+        vad_filter=True,      # built-in VAD
+        beam_size=5
+    )
+
+    for seg in segments:
+        print(f"[{info.language}] {seg.text}")

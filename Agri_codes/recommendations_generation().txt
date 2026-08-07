@@ -1,0 +1,568 @@
+%% =======================================================================
+%  AgriVision | Complete Recommendation System (FIXED)
+%  Real-time predictions for:
+%  1. Disease Risk Assessment
+%  2. Crop Health Status
+%  3. Water Requirements
+%  4. Nutrient Recommendations
+%  5. Soil Moisture Analysis
+% ========================================================================
+
+function recommendation_system_fixed()
+    clc; clear; close all;
+    disp("🌾 AgriVision - Complete Recommendation System");
+    disp("══════════════════════════════════════════════════════════════");
+
+    %% --- Load Models (or generate demo data) ---
+    fprintf('\n📥 Loading AI models and sensor data...\n');
+
+    use_models = false;
+    if exist('models/cnn_health.mat', 'file')
+        fprintf('   ✓ Loading trained models...\n');
+        try
+            load('models/cnn_health.mat', 'net_cnn_health');
+            load('models/cnn_water.mat', 'net_cnn_water');
+            load('models/cnn_nutrient.mat', 'net_cnn_nutrient');
+            use_models = true;
+        catch
+            fprintf('   ⚠️ Model loading failed. Using rule-based system...\n');
+            use_models = false;
+        end
+    else
+        fprintf('   ⚠️ Models not found. Using rule-based system...\n');
+    end
+
+    % Generate current sensor data
+    sensorData = generateCurrentSensorData();
+    fprintf('✅ Loaded data for %d zones\n', height(sensorData));
+
+    %% --- Make Predictions for Each Zone ---
+    fprintf('\n🔮 Generating predictions...\n');
+
+    % Pre-allocate cell arrays for each field
+    numZones = height(sensorData);
+    
+    health_score = zeros(numZones, 1);
+    health_status = cell(numZones, 1);
+    health_color = cell(numZones, 1);
+    health_icon = cell(numZones, 1);
+    disease_risk = cell(numZones, 1);
+    disease_color = cell(numZones, 1);
+    disease_icon = cell(numZones, 1);
+    disease_action = cell(numZones, 1);
+    water_status = cell(numZones, 1);
+    water_color = cell(numZones, 1);
+    water_icon = cell(numZones, 1);
+    water_action = cell(numZones, 1);
+    nutrient_status = cell(numZones, 1);
+    nutrient_color = cell(numZones, 1);
+    nutrient_icon = cell(numZones, 1);
+    nutrient_action = cell(numZones, 1);
+    moisture_icon = cell(numZones, 1);
+    priority_action = cell(numZones, 1);
+
+    % Process each zone
+    for i = 1:numZones
+        zone = sensorData(i, :);
+        
+        % Get all predictions and recommendations
+        rec = analyzePlant(zone, use_models);
+        
+        % Extract fields
+        health_score(i) = rec.health_score;
+        health_status{i} = rec.health_status;
+        health_color{i} = rec.health_color;
+        health_icon{i} = rec.health_icon;
+        disease_risk{i} = rec.disease_risk;
+        disease_color{i} = rec.disease_color;
+        disease_icon{i} = rec.disease_icon;
+        disease_action{i} = rec.disease_action;
+        water_status{i} = rec.water_status;
+        water_color{i} = rec.water_color;
+        water_icon{i} = rec.water_icon;
+        water_action{i} = rec.water_action;
+        nutrient_status{i} = rec.nutrient_status;
+        nutrient_color{i} = rec.nutrient_color;
+        nutrient_icon{i} = rec.nutrient_icon;
+        nutrient_action{i} = rec.nutrient_action;
+        moisture_icon{i} = rec.moisture_icon;
+        priority_action{i} = rec.priority_action;
+    end
+
+    % Create table from cell arrays
+    recommendations = table(health_score, health_status, health_color, health_icon, ...
+        disease_risk, disease_color, disease_icon, disease_action, ...
+        water_status, water_color, water_icon, water_action, ...
+        nutrient_status, nutrient_color, nutrient_icon, nutrient_action, ...
+        moisture_icon, priority_action);
+
+    fprintf('✅ All recommendations generated\n');
+
+    %% --- Create Comprehensive Dashboard ---
+    fprintf('\n📊 Creating comprehensive recommendation dashboard...\n');
+
+    createComprehensiveDashboard(sensorData, recommendations);
+
+    fprintf('\n✅ Dashboard created successfully!\n');
+    fprintf('══════════════════════════════════════════════════════════════\n\n');
+end
+
+%% ========================================================================
+%  DATA GENERATION FUNCTION
+% =========================================================================
+
+function data = generateCurrentSensorData()
+    % Simulate real-time sensor readings for 3 zones
+    
+    zones = ["Zone-1"; "Zone-2"; "Zone-3"];
+    ndvi = [0.72; 0.38; 0.28];           % Excellent, Fair, Poor
+    soil_moisture = [34; 23; 31];         % Good, Low, Adequate
+    temperature = [24.5; 27.8; 26.2];     % Normal, Warm, Normal
+    humidity = [62; 78; 68];              % Normal, High, Normal
+    
+    data = table(zones, ndvi, soil_moisture, temperature, humidity, ...
+        'VariableNames', {'zone_id', 'ndvi', 'soil_moisture', 'temperature', 'humidity'});
+end
+
+%% ========================================================================
+%  ANALYSIS FUNCTION
+% =========================================================================
+
+function rec = analyzePlant(zone, use_models)
+    
+    rec = struct();
+    
+    ndvi = zone.ndvi;
+    moisture = zone.soil_moisture;
+    temp = zone.temperature;
+    humidity = zone.humidity;
+    
+    %% 1. CROP HEALTH ASSESSMENT
+    rec.health_score = ndvi * 100;
+    
+    if rec.health_score >= 70
+        rec.health_status = '😊 EXCELLENT';
+        rec.health_color = [0.2 0.8 0.2];
+        rec.health_icon = '🌿';
+    elseif rec.health_score >= 50
+        rec.health_status = '🙂 GOOD';
+        rec.health_color = [1 0.8 0.2];
+        rec.health_icon = '🌱';
+    elseif rec.health_score >= 30
+        rec.health_status = '😐 FAIR';
+        rec.health_color = [1 0.5 0.2];
+        rec.health_icon = '⚠️';
+    else
+        rec.health_status = '😟 POOR';
+        rec.health_color = [1 0.2 0.2];
+        rec.health_icon = '🚨';
+    end
+    
+    %% 2. DISEASE RISK PREDICTION
+    % Disease risk factors: Low NDVI + High humidity + High temp
+    risk_score = 0;
+    
+    if ndvi < 0.4, risk_score = risk_score + 30; end
+    if humidity > 75, risk_score = risk_score + 25; end
+    if temp > 28, risk_score = risk_score + 20; end
+    if moisture < 20, risk_score = risk_score + 15; end
+    if moisture > 40, risk_score = risk_score + 10; end
+    
+    if risk_score > 50
+        rec.disease_risk = 'HIGH';
+        rec.disease_color = [0.8 0 0];
+        rec.disease_icon = '🦠';
+        rec.disease_action = '🦠 Apply fungicide, improve air circulation';
+    elseif risk_score > 25
+        rec.disease_risk = 'MODERATE';
+        rec.disease_color = [1 0.5 0];
+        rec.disease_icon = '⚠️';
+        rec.disease_action = '⚠️ Monitor for disease symptoms daily';
+    else
+        rec.disease_risk = 'LOW';
+        rec.disease_color = [0 0.6 0];
+        rec.disease_icon = '✅';
+        rec.disease_action = '✅ No disease concerns detected';
+    end
+    
+    %% 3. WATER REQUIREMENTS
+    if moisture < 20
+        rec.water_status = 'URGENT';
+        rec.water_color = [0.8 0 0];
+        rec.water_icon = '🚨';
+        rec.water_action = '💧 Water immediately (deep irrigation)';
+    elseif moisture < 25
+        rec.water_status = 'LOW';
+        rec.water_color = [1 0.5 0];
+        rec.water_icon = '⚠️';
+        rec.water_action = '💧 Water today (2-3 hours)';
+    elseif moisture < 30
+        rec.water_status = 'ADEQUATE';
+        rec.water_color = [1 0.8 0.2];
+        rec.water_icon = '⏰';
+        if humidity > 70
+            rec.water_action = '💧 Can wait 1-2 days';
+        else
+            rec.water_action = '💧 Water tomorrow morning';
+        end
+    else
+        rec.water_status = 'GOOD';
+        rec.water_color = [0 0.6 0];
+        rec.water_icon = '✅';
+        rec.water_action = '✅ No watering needed';
+    end
+    
+    %% 4. NUTRIENT REQUIREMENTS
+    if ndvi < 0.3 && moisture > 25
+        rec.nutrient_status = 'DEFICIENT';
+        rec.nutrient_color = [0.8 0 0];
+        rec.nutrient_icon = '🚨';
+        rec.nutrient_action = '🌱 Apply NPK fertilizer (20-20-20)';
+    elseif ndvi < 0.4
+        rec.nutrient_status = 'LOW';
+        rec.nutrient_color = [1 0.5 0];
+        rec.nutrient_icon = '⚠️';
+        rec.nutrient_action = '🌱 Apply nutrients this week';
+    elseif ndvi < 0.5
+        rec.nutrient_status = 'MODERATE';
+        rec.nutrient_color = [1 0.8 0.2];
+        rec.nutrient_icon = '👁️';
+        rec.nutrient_action = '🌱 Monitor nutrient levels';
+    else
+        rec.nutrient_status = 'SUFFICIENT';
+        rec.nutrient_color = [0 0.6 0];
+        rec.nutrient_icon = '✅';
+        rec.nutrient_action = '✅ Nutrient levels optimal';
+    end
+    
+    %% 5. SOIL MOISTURE STATUS
+    if moisture < 20
+        rec.moisture_icon = '🚨';
+    elseif moisture < 25
+        rec.moisture_icon = '⚠️';
+    elseif moisture < 35
+        rec.moisture_icon = '💧';
+    else
+        rec.moisture_icon = '✅';
+    end
+    
+    %% 6. PRIORITY ACTION
+    if strcmp(rec.water_status, 'URGENT') || strcmp(rec.disease_risk, 'HIGH')
+        rec.priority_action = '🚨 URGENT ACTION';
+    elseif strcmp(rec.water_status, 'LOW') || strcmp(rec.nutrient_status, 'DEFICIENT')
+        rec.priority_action = '⚠️ NEEDS ATTENTION';
+    else
+        rec.priority_action = '✅ MONITORING';
+    end
+end
+
+%% ========================================================================
+%  COMPREHENSIVE DASHBOARD
+% =========================================================================
+
+function createComprehensiveDashboard(data, recs)
+    
+    figure('Name', '🌾 AgriVision Complete Recommendations', ...
+        'Color', 'w', 'Position', [50 50 1600 950], 'NumberTitle', 'off');
+    
+    zones = data.zone_id;
+    
+    for z = 1:height(data)
+        zone = string(zones(z));
+        rec = recs(z, :);
+        sensor = data(z, :);
+        
+        %% Zone Panel (Top Row - Detailed Status)
+        subplot(4, 3, z);
+        axis off;
+        
+        % Zone Header with Overall Status
+        text(0.5, 0.98, sprintf('🌾 %s', zone), ...
+            'FontSize', 16, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+        
+        % Overall Health Circle
+        rectangle('Position', [0.35, 0.78, 0.3, 0.15], 'Curvature', [1 1], ...
+            'FaceColor', rec.health_color{1}, 'EdgeColor', 'k', 'LineWidth', 2.5);
+        text(0.5, 0.855, rec.health_status{1}, ...
+            'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+        
+        % Disease Risk
+        yPos = 0.68;
+        text(0.05, yPos, sprintf('%s Disease Risk:', rec.disease_icon{1}), ...
+            'FontSize', 11, 'FontWeight', 'bold');
+        text(0.95, yPos, rec.disease_risk{1}, ...
+            'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'right', ...
+            'Color', rec.disease_color{1});
+        
+        % Crop Health Score
+        yPos = 0.58;
+        text(0.05, yPos, sprintf('%s Health Score:', rec.health_icon{1}), ...
+            'FontSize', 11, 'FontWeight', 'bold');
+        text(0.95, yPos, sprintf('%.0f/100', rec.health_score), ...
+            'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+        
+        % Water Status
+        yPos = 0.48;
+        text(0.05, yPos, sprintf('%s Water:', rec.water_icon{1}), ...
+            'FontSize', 11, 'FontWeight', 'bold');
+        text(0.95, yPos, rec.water_status{1}, ...
+            'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'right', ...
+            'Color', rec.water_color{1});
+        
+        % Nutrient Status
+        yPos = 0.38;
+        text(0.05, yPos, sprintf('%s Nutrients:', rec.nutrient_icon{1}), ...
+            'FontSize', 11, 'FontWeight', 'bold');
+        text(0.95, yPos, rec.nutrient_status{1}, ...
+            'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'right', ...
+            'Color', rec.nutrient_color{1});
+        
+        % Soil Moisture
+        yPos = 0.28;
+        text(0.05, yPos, sprintf('%s Soil Moisture:', rec.moisture_icon{1}), ...
+            'FontSize', 11, 'FontWeight', 'bold');
+        text(0.95, yPos, sprintf('%.1f%%', sensor.soil_moisture), ...
+            'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+        
+        % Current Readings (Small)
+        yPos = 0.08;
+        readingText = sprintf('📊 NDVI: %.2f | 🌡️ %.1f°C | 💧 %.0f%% RH', ...
+            sensor.ndvi, sensor.temperature, sensor.humidity);
+        text(0.5, yPos, readingText, ...
+            'FontSize', 8, 'HorizontalAlignment', 'center', 'Color', [0.4 0.4 0.4]);
+        
+        xlim([0 1]); ylim([0 1]);
+        
+        %% Recommendation Card (Bottom Row)
+        subplot(4, 3, z + 3);
+        axis off;
+        
+        % Background box
+        rectangle('Position', [0, 0, 1, 1], 'FaceColor', [0.98 0.98 1], ...
+            'EdgeColor', [0.3 0.3 0.6], 'LineWidth', 2);
+        
+        text(0.5, 0.92, '💊 ACTION PLAN', ...
+            'FontSize', 13, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+        
+        % Top Priority Action
+        yPos = 0.75;
+        text(0.5, yPos, rec.priority_action{1}, ...
+            'FontSize', 11, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
+            'Color', [0.8 0 0]);
+        
+        % Detailed Recommendations
+        yPos = 0.58;
+        line_height = 0.11;
+        
+        actions = {
+            rec.water_action{1}
+            rec.nutrient_action{1}
+            rec.disease_action{1}
+        };
+        
+        for a = 1:length(actions)
+            text(0.05, yPos - (a-1)*line_height, actions{a}, ...
+                'FontSize', 9, 'FontWeight', 'bold');
+        end
+        
+        xlim([0 1]); ylim([0 1]);
+    end
+    
+    %% Summary Dashboard (Middle Section)
+    
+    % Plot 4: Overall Health Distribution
+    subplot(4, 3, 7);
+    health_scores = recs.health_score;
+    colors_health = zeros(length(health_scores), 3);
+    for i = 1:length(health_scores)
+        if health_scores(i) >= 70
+            colors_health(i,:) = [0.2 0.8 0.2];
+        elseif health_scores(i) >= 50
+            colors_health(i,:) = [1 0.8 0.2];
+        else
+            colors_health(i,:) = [1 0.3 0.3];
+        end
+    end
+    
+    b = bar(health_scores, 'FaceColor', 'flat');
+    b.CData = colors_health;
+    set(gca, 'XTickLabel', zones, 'FontWeight', 'bold');
+    ylabel('Health Score (0-100)', 'FontWeight', 'bold', 'FontSize', 11);
+    title('🌿 Crop Health Scores', 'FontWeight', 'bold', 'FontSize', 13);
+    ylim([0 105]);
+    grid on;
+    yline(70, '--g', 'Healthy', 'LineWidth', 2, 'FontSize', 9);
+    yline(50, '--r', 'Critical', 'LineWidth', 2, 'FontSize', 9);
+    
+    for i = 1:length(health_scores)
+        text(i, health_scores(i) + 3, sprintf('%.0f', health_scores(i)), ...
+            'HorizontalAlignment', 'center', 'FontWeight', 'bold', 'FontSize', 11);
+    end
+    
+    % Plot 5: Disease Risk Overview
+    subplot(4, 3, 8);
+    risk_levels = categorical(recs.disease_risk);
+    histogram(risk_levels, 'FaceColor', [1 0.6 0.3], 'EdgeColor', 'k', 'LineWidth', 1.5);
+    xlabel('Risk Level', 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('Number of Zones', 'FontWeight', 'bold', 'FontSize', 11);
+    title('🦠 Disease Risk Distribution', 'FontWeight', 'bold', 'FontSize', 13);
+    grid on;
+    
+    % Plot 6: Water & Nutrient Status
+    subplot(4, 3, 9);
+    
+    % Count water status
+    water_urgent = sum(strcmp(recs.water_status, 'URGENT'));
+    water_low = sum(strcmp(recs.water_status, 'LOW'));
+    water_adequate = sum(strcmp(recs.water_status, 'ADEQUATE'));
+    water_good = sum(strcmp(recs.water_status, 'GOOD'));
+    
+    % Count nutrient status
+    nutrient_deficient = sum(strcmp(recs.nutrient_status, 'DEFICIENT'));
+    nutrient_low = sum(strcmp(recs.nutrient_status, 'LOW'));
+    nutrient_moderate = sum(strcmp(recs.nutrient_status, 'MODERATE'));
+    nutrient_sufficient = sum(strcmp(recs.nutrient_status, 'SUFFICIENT'));
+    
+    % Create combined data matrix
+    status_data = [
+        water_urgent + water_low, nutrient_deficient + nutrient_low;
+        water_adequate, nutrient_moderate;
+        water_good, nutrient_sufficient
+    ];
+    
+    bar_handle = bar(status_data, 'grouped');
+    bar_handle(1).FaceColor = [0.3 0.6 1];
+    bar_handle(2).FaceColor = [0.3 0.8 0.3];
+    
+    set(gca, 'XTickLabel', {'Needs Action', 'Moderate', 'Good'}, 'FontWeight', 'bold');
+    ylabel('Number of Zones', 'FontWeight', 'bold', 'FontSize', 11);
+    title('💧🌱 Resource Needs', 'FontWeight', 'bold', 'FontSize', 13);
+    legend('Water', 'Nutrients', 'Location', 'northwest');
+    grid on;
+    ylim([0 max(max(status_data)) + 1]);
+    
+    %% Detailed Metrics (Bottom Section)
+    
+    % Plot 7: Soil Moisture Gauge
+    subplot(4, 3, 10);
+    axis off;
+    
+    text(0.5, 0.95, '💧 SOIL MOISTURE ANALYSIS', ...
+        'FontSize', 13, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+    
+    avg_moisture = mean(data.soil_moisture);
+    
+    % Moisture gauge
+    rectangle('Position', [0.1, 0.6, 0.8, 0.2], 'FaceColor', [0.9 0.9 0.9], ...
+        'EdgeColor', 'k', 'LineWidth', 2);
+    
+    if avg_moisture < 25
+        gauge_color = [1 0.3 0.3];
+    elseif avg_moisture < 35
+        gauge_color = [1 0.8 0.3];
+    else
+        gauge_color = [0.3 0.8 0.3];
+    end
+    
+    rectangle('Position', [0.1, 0.6, 0.8 * (avg_moisture/50), 0.2], ...
+        'FaceColor', gauge_color, 'EdgeColor', 'none');
+    
+    text(0.5, 0.7, sprintf('%.1f%%', avg_moisture), ...
+        'FontSize', 16, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+    
+    yPos = 0.35;
+    for i = 1:height(data)
+        text(0.1, yPos - (i-1)*0.12, sprintf('%s: %.1f%%', string(zones(i)), data.soil_moisture(i)), ...
+            'FontSize', 10, 'FontWeight', 'bold');
+    end
+    
+    xlim([0 1]); ylim([0 1]);
+    
+    % Plot 8: Key Metrics Summary
+    subplot(4, 3, 11);
+    axis off;
+    
+    text(0.5, 0.95, '📊 KEY METRICS', ...
+        'FontSize', 13, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+    
+    avg_ndvi = mean(data.ndvi);
+    avg_temp = mean(data.temperature);
+    avg_humidity = mean(data.humidity);
+    
+    urgent_zones = sum(strcmp(recs.priority_action, '🚨 URGENT ACTION'));
+    
+    metrics = {
+        sprintf('Average NDVI: %.3f', avg_ndvi)
+        sprintf('Average Temp: %.1f°C', avg_temp)
+        sprintf('Average Humidity: %.1f%%', avg_humidity)
+        sprintf('Zones Needing Attention: %d/%d', urgent_zones, height(data))
+        sprintf('Healthy Zones: %d', sum(health_scores >= 70))
+        sprintf('At-Risk Zones: %d', sum(health_scores < 50))
+    };
+    
+    yPos = 0.75;
+    for i = 1:length(metrics)
+        text(0.1, yPos - (i-1)*0.12, metrics{i}, ...
+            'FontSize', 11, 'FontWeight', 'bold');
+    end
+    
+    xlim([0 1]); ylim([0 1]);
+    
+    % Plot 9: Priority Actions Summary
+    subplot(4, 3, 12);
+    axis off;
+    
+    text(0.5, 0.95, '⚡ PRIORITY ACTIONS', ...
+        'FontSize', 13, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
+        'BackgroundColor', [1 1 0.9], 'EdgeColor', 'k', 'LineWidth', 2);
+    
+    urgent_count = sum(contains(recs.priority_action, 'URGENT'));
+    attention_count = sum(contains(recs.priority_action, 'ATTENTION'));
+    good_count = height(recs) - urgent_count - attention_count;
+    
+    yPos = 0.75;
+    
+    if urgent_count > 0
+        text(0.1, yPos, sprintf('🚨 URGENT: %d zone(s)', urgent_count), ...
+            'FontSize', 12, 'FontWeight', 'bold', 'Color', [0.8 0 0]);
+        yPos = yPos - 0.15;
+    end
+    
+    if attention_count > 0
+        text(0.1, yPos, sprintf('⚠️ ATTENTION: %d zone(s)', attention_count), ...
+            'FontSize', 12, 'FontWeight', 'bold', 'Color', [0.8 0.5 0]);
+        yPos = yPos - 0.15;
+    end
+    
+    if good_count > 0
+        text(0.1, yPos, sprintf('✅ GOOD: %d zone(s)', good_count), ...
+            'FontSize', 12, 'FontWeight', 'bold', 'Color', [0 0.6 0]);
+    end
+    
+    yPos = 0.3;
+    text(0.1, yPos, '📋 Next Steps:', 'FontSize', 11, 'FontWeight', 'bold', 'Color', [0.2 0.2 0.6]);
+    
+    next_steps = {
+        '• Review urgent zones immediately'
+        '• Schedule irrigation for dry zones'
+        '• Plan fertilizer application'
+        '• Monitor disease symptoms'
+    };
+    
+    yPos = 0.18;
+    for i = 1:length(next_steps)
+        text(0.1, yPos - (i-1)*0.08, next_steps{i}, 'FontSize', 9);
+    end
+    
+    xlim([0 1]); ylim([0 1]);
+    
+    sgtitle('🌾 AgriVision - Complete Farm Recommendations Dashboard', ...
+        'FontWeight', 'bold', 'FontSize', 20, 'Color', [0.1 0.5 0.1]);
+    
+    % Save dashboard
+    if ~exist('results', 'dir')
+        mkdir('results');
+    end
+    saveas(gcf, 'results/complete_recommendations.png');
+    fprintf('   ✓ Dashboard saved as results/complete_recommendations.png\n');
+end

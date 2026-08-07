@@ -1,0 +1,19 @@
+clc; clear; close all;
+disp("🚀 Starting Agriculture AI Full Demo Pipeline...");
+
+% Ensure data folders exist
+if ~exist('data/processed','dir'); mkdir('data/processed'); end
+if ~exist('data','dir'); mkdir('data'); end
+
+generate_sensor_data();
+generate_corn_data();
+process_ndvi_grid();
+fuse_and_alerts();
+thingspeak_demo();
+dashboard_improved();
+helper_plot_zone();
+window_zone_monitor();
+dashboard_demo();
+
+
+disp("✅ End-to-end demo complete. Check data/processed/ and produced figures.");

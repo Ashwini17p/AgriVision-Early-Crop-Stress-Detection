@@ -1,0 +1,108 @@
+%% 3D Drone Take-Off Simulation with Altitude Graph
+clear; clc; close all
+
+% =========================
+% Simulation Parameters
+% =========================
+t = linspace(0,12,300);      % Time (0–12 s)
+z = zeros(size(t));          % Altitude array
+
+% Define altitude profile (takeoff → hover → descend)
+for i = 1:length(t)
+    if t(i) <= 4
+        z(i) = 0.5 * (t(i)^2) / 4;    % Accelerating take-off
+    elseif t(i) <= 8
+        z(i) = 2;                     % Hover at 2 m
+    else
+        z(i) = 2 - 0.5*((t(i)-8)^2)/4; % Descend smoothly
+    end
+end
+
+% =========================
+% Drone Geometry
+% =========================
+armLength = 0.3;     % Drone arm length (m)
+propRadius = 0.1;    % Propeller radius (m)
+
+% =========================
+% Setup Figure with Two Panels
+% =========================
+figure('Color','w','Position',[100 100 800 600])
+
+% 3D animation subplot
+ax1 = subplot(2,1,1);
+axis(ax1,[-1 1 -1 1 0 3]);
+axis equal
+grid on
+xlabel('X (m)'); ylabel('Y (m)'); zlabel('Z (m)');
+title('3D Drone Take-Off Simulation');
+view(45,25);
+
+% Altitude graph subplot
+ax2 = subplot(2,1,2);
+plot(ax2,t,z,'b','LineWidth',2);
+grid on
+xlabel('Time (s)');
+ylabel('Altitude (m)');
+title('Drone Altitude vs Time');
+ylim([0 2.5]);
+
+% =========================
+% Animation Loop
+% =========================
+for i = 1:length(t)
+    % Switch to 3D subplot
+    axes(ax1);
+    cla;
+    hold on;
+    
+    % Drone center position
+    xc = 0; yc = 0; zc = z(i);
+    
+    % Drone arms
+    plot3([xc-armLength xc+armLength],[yc yc],[zc zc],'k','LineWidth',3)
+    plot3([xc xc],[yc-armLength yc+armLength],[zc zc],'k','LineWidth',3)
+    
+    % Propeller positions
+    props = [ armLength  0;
+             -armLength  0;
+               0  armLength;
+               0 -armLength];
+    
+    % Draw propellers (rotating circles)
+    for p = 1:4
+        theta = linspace(0,2*pi,30);
+        rot = mod(t(i)*10,2*pi);  % rotation speed
+        xp = xc + props(p,1) + propRadius*cos(theta+rot);
+        yp = yc + props(p,2) + propRadius*sin(theta+rot);
+        zp = zc * ones(size(theta));
+        fill3(xp,yp,zp,[0.2 0.6 1],'FaceAlpha',0.8,'EdgeColor','none')
+    end
+    
+    % Shadow on ground
+    for p = 1:4
+        theta = linspace(0,2*pi,30);
+        xp = xc + props(p,1) + propRadius*cos(theta);
+        yp = yc + props(p,2) + propRadius*sin(theta);
+        zp = 0.001*ones(size(theta));
+        fill3(xp,yp,zp,[0.7 0.7 0.7],'FaceAlpha',0.2,'EdgeColor','none')
+    end
+    
+    % Motion trail
+    plot3(zeros(1,i),zeros(1,i),z(1:i),'b--','LineWidth',1.5)
+    
+    % Update altitude graph marker
+    axes(ax2);
+    plot(ax2,t,z,'b','LineWidth',2); hold on;
+    plot(ax2,t(i),z(i),'ro','MarkerFaceColor','r');
+    ylim([0 2.5]);
+    xlabel('Time (s)'); ylabel('Altitude (m)');
+    title('Drone Altitude vs Time');
+    grid on;
+    hold off;
+    
+    % Update the frame
+    drawnow;
+end
+
+disp('✅ Simulation complete — Drone lifted, hovered, and landed.');

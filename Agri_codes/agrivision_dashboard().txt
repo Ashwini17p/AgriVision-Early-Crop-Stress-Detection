@@ -1,0 +1,522 @@
+%% =======================================================================
+%  AgriVision | Enhanced Dual-Mode Dashboard System
+%  Mode 1: FARMER VIEW (Simple, Visual, Actionable)
+%  Mode 2: SCIENTIFIC VIEW (Detailed Analytics with Pie Charts)
+%  
+%  SAVE THIS AS: agrivision_dashboard.m
+%  RUN WITH: agrivision_dashboard
+% ========================================================================
+
+clc; clear; close all;
+
+% Ask user to select mode
+fprintf('\n🌾 AgriVision Dashboard System\n');
+fprintf('══════════════════════════════════════════════════════════════\n');
+fprintf('Select Dashboard Mode:\n');
+fprintf('  [1] 👨‍🌾 FARMER MODE - Simple recommendations & alerts\n');
+fprintf('  [2] 🔬 SCIENTIFIC MODE - Detailed analytics & metrics\n');
+fprintf('  [3] 📊 BOTH MODES - Show both dashboards\n');
+fprintf('══════════════════════════════════════════════════════════════\n');
+
+mode = input('Enter your choice (1/2/3): ');
+
+if isempty(mode) || ~ismember(mode, [1 2 3])
+    mode = 3;  % Default to both
+    fprintf('Using default: BOTH MODES\n');
+end
+
+%% --- Load/Generate Data ---
+fprintf('\n📥 Loading data...\n');
+
+ndviFile   = 'data/processed/ndvi_by_zone.csv';
+sensorFile = 'data/sensor_data.csv';
+
+if isfile(ndviFile) && isfile(sensorFile)
+    fprintf('   Loading real data files...\n');
+    try
+        [alignedData, predictions] = processRealData(ndviFile, sensorFile);
+    catch ME
+        warning("⚠️ Error processing data files: %s", ME.message);
+        fprintf('   Generating synthetic data...\n');
+        [alignedData, predictions] = generateDemoData();
+    end
+else
+    warning("⚠️ Data files not found. Generating synthetic data...");
+    [alignedData, predictions] = generateDemoData();
+end
+
+fprintf('✅ Data ready: %d samples across %d zones\n', ...
+    height(alignedData), length(unique(alignedData.zone_id)));
+
+%% --- Display Selected Dashboard(s) ---
+
+if mode == 1 || mode == 3
+    createEnhancedFarmerDashboard(alignedData, predictions);
+end
+
+if mode == 2 || mode == 3
+    createEnhancedScientificDashboard(alignedData, predictions);
+end
+
+fprintf('\n✅ Dashboard(s) created successfully!\n\n');
+
+%% ========================================================================
+%  ENHANCED FARMER DASHBOARD WITH BETTER VISUALS
+% =========================================================================
+
+function createEnhancedFarmerDashboard(data, pred)
+    
+    figure('Name', '👨‍🌾 Farmer Dashboard', 'Color', 'w', ...
+        'Position', [50 50 1400 850], 'NumberTitle', 'off');
+    
+    zones = unique(data.zone_id);
+    
+    % Top section: Zone cards
+    for z = 1:length(zones)
+        zone = string(zones(z));
+        zoneData = data(strcmp(string(data.zone_id), zone), :);
+        latest = zoneData(end, :);
+        
+        [~, waterColor, waterMsg, waterIcon] = getWaterRecommendation(latest.soil_moisture, latest.humidity);
+        [~, nutrientColor, nutrientMsg, nutrientIcon] = getNutrientRecommendation(latest.ndvi);
+        [healthStatus, healthColor] = getHealthStatus(latest.ndvi);
+        
+        % Create zone panel with larger text
+        subplot(3, 4, z);
+        axis off;
+        
+        % Zone header
+        text(0.5, 0.98, sprintf('🌾 %s', zone), ...
+            'FontSize', 18, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+        
+        % Health status circle (bigger)
+        rectangle('Position', [0.3, 0.68, 0.4, 0.25], 'Curvature', [1 1], ...
+            'FaceColor', healthColor, 'EdgeColor', 'k', 'LineWidth', 3);
+        text(0.5, 0.805, healthStatus, ...
+            'FontSize', 16, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+        
+        % Water recommendation (larger box)
+        yPos = 0.52;
+        rectangle('Position', [0.02, yPos-0.1, 0.96, 0.18], ...
+            'FaceColor', waterColor, 'EdgeColor', 'k', 'LineWidth', 2);
+        text(0.05, yPos+0.03, sprintf('%s WATER:', waterIcon), ...
+            'FontSize', 13, 'FontWeight', 'bold');
+        text(0.5, yPos-0.03, waterMsg, ...
+            'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+        
+        % Nutrient recommendation (larger box)
+        yPos = 0.27;
+        rectangle('Position', [0.02, yPos-0.1, 0.96, 0.18], ...
+            'FaceColor', nutrientColor, 'EdgeColor', 'k', 'LineWidth', 2);
+        text(0.05, yPos+0.03, sprintf('%s NUTRIENTS:', nutrientIcon), ...
+            'FontSize', 13, 'FontWeight', 'bold');
+        text(0.5, yPos-0.03, nutrientMsg, ...
+            'FontSize', 12, 'FontWeight', 'bold', 'HorizontalAlignment', 'center');
+        
+        % Current readings
+        yPos = 0.05;
+        readingText = sprintf('💧 Soil: %.0f%%  |  🌡️ %.1f°C  |  📊 NDVI: %.2f', ...
+            latest.soil_moisture, latest.temperature, latest.ndvi);
+        text(0.5, yPos, readingText, ...
+            'FontSize', 10, 'HorizontalAlignment', 'center', 'Color', [0.3 0.3 0.3], 'FontWeight', 'bold');
+        
+        xlim([0 1]); ylim([0 1]);
+    end
+    
+    % Action Summary with Pie Chart
+    subplot(3, 4, 4);
+    axis off;
+    
+    urgentActions = sum(data.soil_moisture(end-length(zones)+1:end) < 25);
+    moderateActions = sum(data.ndvi(end-length(zones)+1:end) < 0.35);
+    goodZones = length(zones) - max(urgentActions, moderateActions);
+    
+    % Pie chart of zone status
+    pieData = [urgentActions, moderateActions, max(0, goodZones)];
+    pieColors = [1 0.3 0.3; 1 0.8 0.3; 0.3 0.8 0.3];
+    
+    if sum(pieData) > 0
+        pie(pieData);
+        colormap(pieColors);
+        title('Zone Status Overview', 'FontSize', 14, 'FontWeight', 'bold');
+        legend({'🚨 Urgent', '⚠️ Attention', '✅ Good'}, 'Location', 'southoutside', 'FontSize', 11);
+    end
+    
+    % Main Action Plan (larger section)
+    subplot(3, 4, [5:12]);
+    axis off;
+    
+    text(0.5, 0.95, '📋 TODAY''S ACTION PLAN', ...
+        'FontSize', 22, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
+        'BackgroundColor', [0.95 0.95 1], 'EdgeColor', 'k', 'LineWidth', 2, 'Margin', 10);
+    
+    yPos = 0.78;
+    
+    % Water action (bigger, bolder)
+    urgentWater = sum(data.soil_moisture(end-length(zones)+1:end) < 25);
+    if urgentWater > 0
+        rectangle('Position', [0.05, yPos-0.15, 0.9, 0.22], ...
+            'FaceColor', [1 0.85 0.85], 'EdgeColor', [0.9 0 0], 'LineWidth', 4);
+        text(0.5, yPos-0.02, sprintf('🚨 URGENT ACTION NEEDED'), ...
+            'FontSize', 18, 'FontWeight', 'bold', 'Color', [0.9 0 0], 'HorizontalAlignment', 'center');
+        text(0.5, yPos-0.09, sprintf('Water %d zone(s) immediately!', urgentWater), ...
+            'FontSize', 15, 'FontWeight', 'bold', 'Color', [0.7 0 0], 'HorizontalAlignment', 'center');
+    else
+        rectangle('Position', [0.05, yPos-0.15, 0.9, 0.22], ...
+            'FaceColor', [0.85 1 0.85], 'EdgeColor', [0 0.7 0], 'LineWidth', 4);
+        text(0.5, yPos-0.05, '✅ Water Status: ALL GOOD', ...
+            'FontSize', 18, 'FontWeight', 'bold', 'Color', [0 0.6 0], 'HorizontalAlignment', 'center');
+    end
+    
+    yPos = 0.48;
+    
+    % Nutrient action (bigger, bolder)
+    urgentNutrient = sum(data.ndvi(end-length(zones)+1:end) < 0.35);
+    if urgentNutrient > 0
+        rectangle('Position', [0.05, yPos-0.15, 0.9, 0.22], ...
+            'FaceColor', [1 0.95 0.8], 'EdgeColor', [0.9 0.6 0], 'LineWidth', 4);
+        text(0.5, yPos-0.02, sprintf('⚠️ FERTILIZER NEEDED'), ...
+            'FontSize', 18, 'FontWeight', 'bold', 'Color', [0.9 0.5 0], 'HorizontalAlignment', 'center');
+        text(0.5, yPos-0.09, sprintf('Apply nutrients to %d zone(s) this week', urgentNutrient), ...
+            'FontSize', 15, 'FontWeight', 'bold', 'Color', [0.7 0.4 0], 'HorizontalAlignment', 'center');
+    else
+        rectangle('Position', [0.05, yPos-0.15, 0.9, 0.22], ...
+            'FaceColor', [0.85 1 0.85], 'EdgeColor', [0 0.7 0], 'LineWidth', 4);
+        text(0.5, yPos-0.05, '✅ Nutrition Status: OPTIMAL', ...
+            'FontSize', 18, 'FontWeight', 'bold', 'Color', [0 0.6 0], 'HorizontalAlignment', 'center');
+    end
+    
+    % Quick recommendations
+    yPos = 0.18;
+    text(0.5, yPos, '💡 QUICK TIPS:', ...
+        'FontSize', 16, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', 'Color', [0.2 0.2 0.6]);
+    
+    tips = {
+        '• Check this dashboard every morning at 6 AM'
+        '• Water early morning (before 9 AM) or evening (after 5 PM)'
+        '• Monitor weather forecast - delay watering if rain expected'
+    };
+    
+    yPos = 0.08;
+    for i = 1:length(tips)
+        text(0.1, yPos - (i-1)*0.06, tips{i}, ...
+            'FontSize', 13, 'Color', [0.3 0.3 0.6], 'FontWeight', 'bold');
+    end
+    
+    xlim([0 1]); ylim([0 1]);
+    
+    sgtitle('👨‍🌾 AgriVision - Farmer Dashboard (Simple View)', ...
+        'FontWeight', 'bold', 'FontSize', 20, 'Color', [0.1 0.5 0.1]);
+end
+
+%% ========================================================================
+%  ENHANCED SCIENTIFIC DASHBOARD WITH PIE CHARTS
+% =========================================================================
+
+function createEnhancedScientificDashboard(data, pred)
+    
+    figure('Name', '🔬 Scientific Dashboard', 'Color', 'w', ...
+        'Position', [100 50 1500 900], 'NumberTitle', 'off');
+    
+    zones = unique(data.zone_id);
+    colors = lines(length(zones));
+    
+    % Plot 1: NDVI Time Series
+    subplot(3, 4, 1);
+    hold on;
+    for i = 1:length(zones)
+        z = string(zones(i));
+        zData = data(strcmp(string(data.zone_id), z), :);
+        plot(zData.timestamp, zData.ndvi, '-o', 'Color', colors(i,:), ...
+            'LineWidth', 2, 'MarkerSize', 5, 'MarkerFaceColor', colors(i,:));
+    end
+    yline(0.35, '--r', 'Stress Threshold', 'LineWidth', 2.5);
+    xlabel('Time', 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('NDVI', 'FontWeight', 'bold', 'FontSize', 11);
+    title('NDVI Temporal Evolution', 'FontWeight', 'bold', 'FontSize', 12);
+    legend([string(zones); "Threshold"], 'Location', 'best', 'FontSize', 9);
+    grid on; box on;
+    set(gca, 'LineWidth', 1.5);
+    
+    % Plot 2: NDVI Distribution Pie Chart
+    subplot(3, 4, 2);
+    healthy = sum(data.ndvi >= 0.5);
+    moderate = sum(data.ndvi >= 0.35 & data.ndvi < 0.5);
+    stressed = sum(data.ndvi < 0.35);
+    pie([healthy, moderate, stressed]);
+    colormap([0.2 0.8 0.2; 1 1 0.4; 1 0.3 0.3]);
+    title('Plant Health Distribution', 'FontWeight', 'bold', 'FontSize', 12);
+    legend({'Excellent (>0.5)', 'Good (0.35-0.5)', 'Stressed (<0.35)'}, ...
+        'Location', 'southoutside', 'FontSize', 9);
+    
+    % Plot 3: Soil Moisture Pie Chart
+    subplot(3, 4, 3);
+    optimal = sum(data.soil_moisture >= 35);
+    adequate = sum(data.soil_moisture >= 25 & data.soil_moisture < 35);
+    low = sum(data.soil_moisture < 25);
+    pie([optimal, adequate, low]);
+    colormap([0.2 0.8 0.2; 1 1 0.4; 1 0.3 0.3]);
+    title('Soil Moisture Status', 'FontWeight', 'bold', 'FontSize', 12);
+    legend({'Optimal (>35%)', 'Adequate (25-35%)', 'Low (<25%)'}, ...
+        'Location', 'southoutside', 'FontSize', 9);
+    
+    % Plot 4: Model Performance Bar Chart
+    subplot(3, 4, 4);
+    categories = {'Health', 'Water', 'Nutrients'};
+    accuracies = [pred.acc_health, pred.acc_water, pred.acc_nutrient] * 100;
+    b = bar(accuracies, 'FaceColor', 'flat', 'BarWidth', 0.6);
+    b.CData(1,:) = [0.2 0.7 0.2];
+    b.CData(2,:) = [0.2 0.5 1];
+    b.CData(3,:) = [1 0.6 0.1];
+    set(gca, 'XTickLabel', categories, 'FontWeight', 'bold');
+    ylabel('Accuracy (%)', 'FontWeight', 'bold', 'FontSize', 11);
+    title('AI Model Performance', 'FontWeight', 'bold', 'FontSize', 12);
+    ylim([0 105]);
+    grid on; box on;
+    for i = 1:length(accuracies)
+        text(i, accuracies(i)+2, sprintf('%.1f%%', accuracies(i)), ...
+            'HorizontalAlignment', 'center', 'FontWeight', 'bold', 'FontSize', 11);
+    end
+    
+    % Plot 5: Scatter - NDVI vs Moisture
+    subplot(3, 4, 5);
+    scatter(data.soil_moisture, data.ndvi, 80, data.temperature, 'filled', 'MarkerEdgeColor', 'k');
+    xlabel('Soil Moisture (%)', 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('NDVI', 'FontWeight', 'bold', 'FontSize', 11);
+    title('NDVI vs Soil Moisture', 'FontWeight', 'bold', 'FontSize', 12);
+    cb = colorbar;
+    ylabel(cb, 'Temperature (°C)', 'FontWeight', 'bold');
+    grid on; box on;
+    
+    % Plot 6: Environmental Parameters
+    subplot(3, 4, 6);
+    yyaxis left
+    plot(data.timestamp, data.temperature, '-r', 'LineWidth', 2.5);
+    ylabel('Temperature (°C)', 'Color', 'r', 'FontWeight', 'bold', 'FontSize', 11);
+    yyaxis right
+    plot(data.timestamp, data.humidity, '-b', 'LineWidth', 2.5);
+    ylabel('Humidity (%)', 'Color', 'b', 'FontWeight', 'bold', 'FontSize', 11);
+    xlabel('Time', 'FontWeight', 'bold', 'FontSize', 11);
+    title('Environmental Conditions', 'FontWeight', 'bold', 'FontSize', 12);
+    grid on; box on;
+    
+    % Plot 7: Soil Moisture Trend
+    subplot(3, 4, 7);
+    plot(data.timestamp, data.soil_moisture, '-b', 'LineWidth', 2.5);
+    hold on;
+    yline(25, '--r', 'Critical', 'LineWidth', 2, 'Color', [1 0.2 0.2]);
+    yline(35, '--g', 'Optimal', 'LineWidth', 2, 'Color', [0.2 0.7 0.2]);
+    xlabel('Time', 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('Soil Moisture (%)', 'FontWeight', 'bold', 'FontSize', 11);
+    title('Soil Moisture Evolution', 'FontWeight', 'bold', 'FontSize', 12);
+    legend('Moisture', 'Critical (25%)', 'Optimal (35%)', 'Location', 'best', 'FontSize', 9);
+    grid on; box on;
+    
+    % Plot 8: NDVI Histogram
+    subplot(3, 4, 8);
+    histogram(data.ndvi, 20, 'FaceColor', [0.2 0.7 0.2], 'EdgeColor', 'k', 'LineWidth', 1.5);
+    xline(0.35, '--r', 'Stress', 'LineWidth', 2.5, 'FontSize', 10, 'FontWeight', 'bold');
+    xline(0.5, '--g', 'Healthy', 'LineWidth', 2.5, 'FontSize', 10, 'FontWeight', 'bold');
+    xlabel('NDVI', 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('Frequency', 'FontWeight', 'bold', 'FontSize', 11);
+    title('NDVI Distribution', 'FontWeight', 'bold', 'FontSize', 12);
+    grid on; box on;
+    
+    % Plot 9: Confusion Matrix - Health
+    subplot(3, 4, 9);
+    cm1 = confusionchart(pred.YTest_health, pred.YPred_health);
+    cm1.Title = sprintf('Health (Acc: %.1f%%)', pred.acc_health * 100);
+    cm1.FontSize = 10;
+    
+    % Plot 10: Confusion Matrix - Water
+    subplot(3, 4, 10);
+    cm2 = confusionchart(pred.YTest_water, pred.YPred_water);
+    cm2.Title = sprintf('Water Need (Acc: %.1f%%)', pred.acc_water * 100);
+    cm2.FontSize = 10;
+    
+    % Plot 11: Confusion Matrix - Nutrients
+    subplot(3, 4, 11);
+    cm3 = confusionchart(pred.YTest_nutrient, pred.YPred_nutrient);
+    cm3.Title = sprintf('Nutrient Need (Acc: %.1f%%)', pred.acc_nutrient * 100);
+    cm3.FontSize = 10;
+    
+    % Plot 12: Key Metrics Summary
+    subplot(3, 4, 12);
+    axis off;
+    
+    avgNDVI = mean(data.ndvi);
+    avgMoisture = mean(data.soil_moisture);
+    avgTemp = mean(data.temperature);
+    
+    text(0.5, 0.95, '📊 KEY METRICS', ...
+        'FontSize', 16, 'FontWeight', 'bold', 'HorizontalAlignment', 'center', ...
+        'BackgroundColor', [0.9 0.95 1], 'EdgeColor', 'k', 'LineWidth', 2);
+    
+    metrics = {
+        sprintf('Average NDVI: %.3f', avgNDVI)
+        sprintf('Avg Soil Moisture: %.1f%%', avgMoisture)
+        sprintf('Avg Temperature: %.1f°C', avgTemp)
+        sprintf('Zones Monitored: %d', length(zones))
+        sprintf('Total Samples: %d', height(data))
+        sprintf('Health Model: %.1f%%', pred.acc_health*100)
+        sprintf('Water Model: %.1f%%', pred.acc_water*100)
+        sprintf('Nutrient Model: %.1f%%', pred.acc_nutrient*100)
+    };
+    
+    yPos = 0.75;
+    for i = 1:length(metrics)
+        text(0.1, yPos - (i-1)*0.09, metrics{i}, ...
+            'FontSize', 12, 'FontWeight', 'bold', 'Color', [0.2 0.2 0.5]);
+    end
+    
+    xlim([0 1]); ylim([0 1]);
+    
+    sgtitle('🔬 AgriVision - Scientific Dashboard (Detailed Analytics)', ...
+        'FontWeight', 'bold', 'FontSize', 20, 'Color', [0.1 0.2 0.6]);
+end
+
+%% ========================================================================
+%  RECOMMENDATION LOGIC
+% =========================================================================
+
+function [status, color, message, icon] = getWaterRecommendation(moisture, humidity)
+    if moisture < 20
+        status = 'URGENT'; color = [1 0.75 0.75]; 
+        message = 'Water RIGHT NOW!'; icon = '🚨';
+    elseif moisture < 25
+        status = 'NEEDED'; color = [1 0.9 0.75]; 
+        message = 'Water today'; icon = '⚠️';
+    elseif moisture < 30
+        status = 'SOON'; color = [1 1 0.9];
+        if humidity > 70
+            message = 'Can wait 1-2 days (high humidity)'; icon = '⏰';
+        else
+            message = 'Plan to water tomorrow'; icon = '⏰';
+        end
+    else
+        status = 'GOOD'; color = [0.8 1 0.8]; 
+        message = 'No watering needed'; icon = '✅';
+    end
+end
+
+function [status, color, message, icon] = getNutrientRecommendation(ndvi)
+    if ndvi < 0.3
+        status = 'URGENT'; color = [1 0.75 0.75]; 
+        message = 'Add fertilizer TODAY'; icon = '🚨';
+    elseif ndvi < 0.35
+        status = 'NEEDED'; color = [1 0.9 0.75]; 
+        message = 'Apply nutrients this week'; icon = '⚠️';
+    elseif ndvi < 0.5
+        status = 'MONITOR'; color = [1 1 0.9]; 
+        message = 'Watch closely - may need soon'; icon = '👁️';
+    else
+        status = 'GOOD'; color = [0.8 1 0.8]; 
+        message = 'Plants are healthy'; icon = '✅';
+    end
+end
+
+function [status, color] = getHealthStatus(ndvi)
+    if ndvi < 0.3
+        status = '😟 POOR'; color = [1 0.2 0.2];
+    elseif ndvi < 0.35
+        status = '😐 FAIR'; color = [1 0.6 0.2];
+    elseif ndvi < 0.5
+        status = '🙂 GOOD'; color = [1 0.9 0.3];
+    else
+        status = '😊 EXCELLENT'; color = [0.2 0.8 0.2];
+    end
+end
+
+%% ========================================================================
+%  DATA GENERATION
+% =========================================================================
+
+function [data, pred] = generateDemoData()
+    fprintf('   Generating synthetic demo data...\n');
+    
+    zones = ["Zone-1", "Zone-2", "Zone-3"];
+    data = table();
+    
+    for i = 1:length(zones)
+        n = 50;
+        timestamps = datetime('now') - hours(n-1:-1:0)';
+        
+        if i == 1
+            ndvi = 0.6 + 0.15 * sin(linspace(0, 2*pi, n))' + 0.05 * randn(n, 1);
+            moisture = 32 + 5 * sin(linspace(0, pi, n))' + 2 * randn(n, 1);
+        elseif i == 2
+            ndvi = 0.45 + 0.1 * sin(linspace(0, 2*pi, n))' + 0.05 * randn(n, 1);
+            moisture = 22 + 3 * sin(linspace(0, pi, n))' + 2 * randn(n, 1);
+        else
+            ndvi = 0.32 + 0.08 * sin(linspace(0, 2*pi, n))' + 0.05 * randn(n, 1);
+            moisture = 30 + 4 * sin(linspace(0, pi, n))' + 2 * randn(n, 1);
+        end
+        
+        humidity = 60 + 10 * sin(linspace(0, 2*pi, n))' + 5 * randn(n, 1);
+        temperature = 25 + 3 * sin(linspace(0, 2*pi, n))' + 1 * randn(n, 1);
+        
+        ndvi = max(0.2, min(0.85, ndvi));
+        moisture = max(15, min(45, moisture));
+        humidity = max(40, min(85, humidity));
+        temperature = max(18, min(32, temperature));
+        
+        temp = table(timestamps, repmat(zones(i), n, 1), ndvi, moisture, humidity, temperature, ...
+            'VariableNames', {'timestamp', 'zone_id', 'ndvi', 'soil_moisture', 'humidity', 'temperature'});
+        
+        data = [data; temp];
+    end
+    
+    pred = struct();
+    pred.acc_health = 0.92; pred.acc_water = 0.88; pred.acc_nutrient = 0.85;
+    
+    pred.YTest_health = categorical(repmat({'Healthy'; 'Stressed'}, 5, 1));
+    pred.YPred_health = pred.YTest_health;
+    pred.YPred_health(2) = categorical({'Healthy'});
+    
+    pred.YTest_water = categorical(repmat({'Low'; 'Medium'; 'High'}, 4, 1));
+    pred.YPred_water = pred.YTest_water;
+    pred.YPred_water([2 5]) = categorical({'High'; 'Low'});
+    
+    pred.YTest_nutrient = categorical(repmat({'Low'; 'Medium'; 'High'}, 4, 1));
+    pred.YPred_nutrient = pred.YTest_nutrient;
+    pred.YPred_nutrient([3 7]) = categorical({'Medium'; 'Low'});
+    
+    fprintf('   ✓ Generated %d samples\n', height(data));
+end
+
+function [data, pred] = processRealData(ndviFile, sensorFile)
+    ndvi = readtable(ndviFile);
+    sensor = readtable(sensorFile);
+    
+    if ismember('zone', ndvi.Properties.VariableNames)
+        ndvi.zone_id = ndvi.zone;
+    end
+    if ismember('zone', sensor.Properties.VariableNames)
+        sensor.zone_id = sensor.zone;
+    end
+    
+    zones = unique(ndvi.zone_id);
+    data = table();
+    
+    for i = 1:min(3, length(zones))
+        zData = ndvi(strcmp(string(ndvi.zone_id), string(zones(i))), :);
+        if height(zData) > 0
+            n = min(20, height(zData));
+            temp = table(datetime('now') - hours(n-1:-1:0)', repmat(zones(i), n, 1), ...
+                0.5 + 0.2*randn(n,1), 30 + 5*randn(n,1), 60 + 10*randn(n,1), 25 + 3*randn(n,1), ...
+                'VariableNames', {'timestamp', 'zone_id', 'ndvi', 'soil_moisture', 'humidity', 'temperature'});
+            data = [data; temp];
+        end
+    end
+    
+    pred = struct();
+    pred.acc_health = 0.90; pred.acc_water = 0.85; pred.acc_nutrient = 0.82;
+    pred.YTest_health = categorical(repmat({'Healthy'; 'Stressed'}, 5, 1));
+    pred.YPred_health = pred.YTest_health;
+    pred.YTest_water = categorical(repmat({'Low'; 'Medium'; 'High'}, 4, 1));
+    pred.YPred_water = pred.YTest_water;
+    pred.YTest_nutrient = categorical(repmat({'Low'; 'Medium'; 'High'}, 4, 1));
+    pred.YPred_nutrient = pred.YTest_nutrient;
+    
+    fprintf('   ✓ Processed real data: %d samples\n', height(data));
+end

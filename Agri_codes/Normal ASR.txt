@@ -1,0 +1,11 @@
+import os
+import whisper
+
+# FORCE ffmpeg path
+os.environ["PATH"] += os.pathsep + r"C:\ffmpeg\bin"
+
+model = whisper.load_model("base")
+result = model.transcribe("sumsum.wav.opus")
+
+print("\n===== TRANSCRIBED TEXT =====\n")
+print(result["text"])

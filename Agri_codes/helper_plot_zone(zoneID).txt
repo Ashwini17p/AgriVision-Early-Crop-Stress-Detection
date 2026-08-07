@@ -1,0 +1,10 @@
+function helper_plot_zone(zoneID)
+if nargin < 1, zoneID = 'Zone-1'; end
+nd = readtable('data/corn_data.csv');
+ndz = nd(strcmp(nd.zone,zoneID),:);
+
+figure;
+scatter(ndz.longitude, ndz.latitude, 50, ndz.NIR, 'filled');
+colorbar; xlabel('Longitude'); ylabel('Latitude');
+title(['Spectral Map for ', zoneID]);
+end

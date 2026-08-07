@@ -1,0 +1,187 @@
+%% Quick LSTM Test - Standalone Version
+clc; clear; close all;
+
+fprintf('🧪 AgriVision LSTM Quick Test\n');
+fprintf('════════════════════════════════════════\n\n');
+
+%% Step 1: Check if model exists
+if exist('models/ndvi_lstm_model.mat', 'file')
+    fprintf('✅ Found existing model. Loading...\n');
+    load('models/ndvi_lstm_model.mat', 'net');
+else
+    fprintf('⚠️ No trained model found.\n');
+    fprintf('Please train the model first by running:\n');
+    fprintf('   >> train_ndvi_lstm_fixed\n\n');
+    
+    response = input('Train model now? (y/n): ', 's');
+    if lower(response) == 'y'
+        % Run the training function directly
+        train_ndvi_lstm_fixed();
+        
+        % Load the newly trained model
+        load('models/ndvi_lstm_model.mat', 'net');
+    else
+        error('Model required. Exiting...');
+    end
+end
+
+%% Step 2: Test predictions on different scenarios
+fprintf('\n🔬 Testing LSTM on different crop scenarios...\n\n');
+
+% Scenario 1: Declining health (drought stress)
+fprintf('📉 Scenario 1: Declining Health (Drought Stress)\n');
+testSeq1 = [
+    0.65, 0.62, 0.58, 0.55, 0.52, 0.48;   % NDVI decreasing
+    30,   28,   25,   23,   22,   20;     % Soil moisture dropping
+    65,   64,   66,   65,   63,   62      % Humidity stable
+];
+
+prediction1 = classify(net, testSeq1);
+fprintf('   📊 Input: NDVI 0.65→0.48, Moisture 30%%→20%%\n');
+fprintf('   🎯 Prediction: %s\n', char(prediction1));
+fprintf('   💡 Interpretation: Drought stress detected - irrigate immediately\n\n');
+
+% Scenario 2: Improving health (recovery)
+fprintf('📈 Scenario 2: Improving Health (Recovery)\n');
+testSeq2 = [
+    0.45, 0.48, 0.52, 0.56, 0.60, 0.65;   % NDVI increasing
+    20,   22,   25,   28,   30,   33;     % Soil moisture increasing
+    70,   68,   65,   63,   62,   60      % Humidity decreasing
+];
+
+prediction2 = classify(net, testSeq2);
+fprintf('   📊 Input: NDVI 0.45→0.65, Moisture 20%%→33%%\n');
+fprintf('   🎯 Prediction: %s\n', char(prediction2));
+fprintf('   💡 Interpretation: Plant recovering after irrigation\n\n');
+
+% Scenario 3: Stable healthy plant
+fprintf('✅ Scenario 3: Stable Healthy Plant\n');
+testSeq3 = [
+    0.70, 0.72, 0.71, 0.70, 0.72, 0.71;   % NDVI stable high
+    35,   34,   36,   35,   34,   35;     % Soil moisture good
+    60,   62,   61,   60,   62,   61      % Humidity normal
+];
+
+prediction3 = classify(net, testSeq3);
+fprintf('   📊 Input: NDVI ~0.71, Moisture ~35%%\n');
+fprintf('   🎯 Prediction: %s\n', char(prediction3));
+fprintf('   💡 Interpretation: Optimal conditions maintained\n\n');
+
+% Scenario 4: Critical decline (disease + drought)
+fprintf('🚨 Scenario 4: Critical Decline (Disease + Drought)\n');
+testSeq4 = [
+    0.60, 0.50, 0.40, 0.30, 0.25, 0.20;   % NDVI crashing
+    30,   27,   24,   21,   18,   15;     % Soil moisture very low
+    75,   78,   80,   83,   85,   88      % Humidity rising (disease risk)
+];
+
+prediction4 = classify(net, testSeq4);
+fprintf('   📊 Input: NDVI 0.60→0.20, Moisture 30%%→15%%, Humidity rising\n');
+fprintf('   🎯 Prediction: %s\n', char(prediction4));
+fprintf('   💡 Interpretation: Emergency - multiple stressors detected\n\n');
+
+%% Step 3: Visualize predictions
+fprintf('📊 Creating visualization...\n');
+
+figure('Name', 'LSTM Prediction Results', 'Position', [100, 100, 1200, 600]);
+
+% Plot 1: Scenario 1 - Declining
+subplot(2, 4, 1);
+plot(1:6, testSeq1(1,:), '-ro', 'LineWidth', 2, 'MarkerSize', 8);
+hold on;
+yline(0.5, '--k', 'Stress Threshold');
+title('Scenario 1: Declining', 'FontWeight', 'bold');
+ylabel('NDVI');
+xlabel('Time Step');
+ylim([0 1]);
+grid on;
+text(3, 0.9, sprintf('Prediction: %s', char(prediction1)), ...
+    'FontSize', 10, 'FontWeight', 'bold', 'Color', 'r');
+
+% Plot 2: Moisture for Scenario 1
+subplot(2, 4, 5);
+plot(1:6, testSeq1(2,:), '-bo', 'LineWidth', 2, 'MarkerSize', 8);
+title('Soil Moisture', 'FontWeight', 'bold');
+ylabel('Moisture (%)');
+xlabel('Time Step');
+ylim([0 50]);
+grid on;
+
+% Plot 3: Scenario 2 - Improving
+subplot(2, 4, 2);
+plot(1:6, testSeq2(1,:), '-go', 'LineWidth', 2, 'MarkerSize', 8);
+hold on;
+yline(0.5, '--k', 'Stress Threshold');
+title('Scenario 2: Improving', 'FontWeight', 'bold');
+ylabel('NDVI');
+xlabel('Time Step');
+ylim([0 1]);
+grid on;
+text(3, 0.9, sprintf('Prediction: %s', char(prediction2)), ...
+    'FontSize', 10, 'FontWeight', 'bold', 'Color', 'g');
+
+% Plot 4: Moisture for Scenario 2
+subplot(2, 4, 6);
+plot(1:6, testSeq2(2,:), '-bo', 'LineWidth', 2, 'MarkerSize', 8);
+title('Soil Moisture', 'FontWeight', 'bold');
+ylabel('Moisture (%)');
+xlabel('Time Step');
+ylim([0 50]);
+grid on;
+
+% Plot 5: Scenario 3 - Stable
+subplot(2, 4, 3);
+plot(1:6, testSeq3(1,:), '-go', 'LineWidth', 2, 'MarkerSize', 8);
+hold on;
+yline(0.5, '--k', 'Stress Threshold');
+title('Scenario 3: Stable', 'FontWeight', 'bold');
+ylabel('NDVI');
+xlabel('Time Step');
+ylim([0 1]);
+grid on;
+text(3, 0.9, sprintf('Prediction: %s', char(prediction3)), ...
+    'FontSize', 10, 'FontWeight', 'bold', 'Color', 'g');
+
+% Plot 6: Moisture for Scenario 3
+subplot(2, 4, 7);
+plot(1:6, testSeq3(2,:), '-bo', 'LineWidth', 2, 'MarkerSize', 8);
+title('Soil Moisture', 'FontWeight', 'bold');
+ylabel('Moisture (%)');
+xlabel('Time Step');
+ylim([0 50]);
+grid on;
+
+% Plot 7: Scenario 4 - Critical
+subplot(2, 4, 4);
+plot(1:6, testSeq4(1,:), '-ro', 'LineWidth', 2, 'MarkerSize', 8);
+hold on;
+yline(0.5, '--k', 'Stress Threshold');
+title('Scenario 4: Critical', 'FontWeight', 'bold');
+ylabel('NDVI');
+xlabel('Time Step');
+ylim([0 1]);
+grid on;
+text(3, 0.9, sprintf('Prediction: %s', char(prediction4)), ...
+    'FontSize', 10, 'FontWeight', 'bold', 'Color', 'r');
+
+% Plot 8: Moisture for Scenario 4
+subplot(2, 4, 8);
+plot(1:6, testSeq4(2,:), '-bo', 'LineWidth', 2, 'MarkerSize', 8);
+title('Soil Moisture', 'FontWeight', 'bold');
+ylabel('Moisture (%)');
+xlabel('Time Step');
+ylim([0 50]);
+grid on;
+
+sgtitle('🌾 AgriVision LSTM - Time Series Prediction Results', ...
+    'FontSize', 16, 'FontWeight', 'bold');
+
+fprintf('✅ Visualization created!\n\n');
+
+fprintf('════════════════════════════════════════\n');
+fprintf('Summary:\n');
+fprintf('  Scenario 1 (Declining): %s\n', char(prediction1));
+fprintf('  Scenario 2 (Improving): %s\n', char(prediction2));
+fprintf('  Scenario 3 (Stable):    %s\n', char(prediction3));
+fprintf('  Scenario 4 (Critical):  %s\n', char(prediction4));
+fprintf('════════════════════════════════════════\n\n');

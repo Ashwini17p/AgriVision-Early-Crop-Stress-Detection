@@ -1,0 +1,25 @@
+function fuse_and_alerts()
+disp("⚡ Running data fusion and alert generation...");
+
+sensor = readtable('data/sensor_data.csv');
+ndvi = readtable('data/processed/ndvi_by_zone.csv');
+joined = innerjoin(sensor, ndvi, 'Keys','zone');
+
+alerts = strings(height(joined),1);
+
+for i = 1:height(joined)
+    ndv = joined.avgNDVI(i);
+    moist = joined.soil_moisture(i);
+    if ndv < 0.3 && moist < 30
+        alerts(i) = "🚨 Irrigate immediately - Low NDVI + Dry Soil";
+    elseif ndv < 0.5
+        alerts(i) = "⚠️ Nutrient stress - Monitor crop health";
+    else
+        alerts(i) = "✅ Healthy condition";
+    end
+end
+
+joined.alert = alerts;
+writetable(joined,'data/processed/alerts.csv');
+disp("✅ Data fusion complete. Alerts written to data/processed/alerts.csv");
+end

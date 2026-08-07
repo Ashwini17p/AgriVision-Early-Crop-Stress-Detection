@@ -1,0 +1,546 @@
+%% ========================================================================
+%  AgriVision - Water Prediction Demo Script (FIXED - Script Version)
+%  Interactive demo for water level predictions
+%  
+%  SAVE AS: water_prediction_demo.m
+%  RUN WITH: water_prediction_demo
+% =========================================================================
+
+clc; clear; close all;
+
+fprintf('\n╔════════════════════════════════════════════════╗\n');
+fprintf('║  💧 AgriVision Water Prediction System 💧     ║\n');
+fprintf('╚════════════════════════════════════════════════╝\n\n');
+
+%% Select demo mode
+fprintf('Select demo mode:\n');
+fprintf('1. Auto Demo (uses sample data)\n');
+fprintf('2. Custom Input (enter your field data)\n');
+fprintf('3. Compare Multiple Crops\n');
+fprintf('4. Drought Scenario Analysis\n\n');
+
+choice = input('Enter choice (1-4): ');
+
+if isempty(choice) || choice < 1 || choice > 4
+    choice = 1;
+    fprintf('Invalid choice. Running auto demo...\n');
+end
+
+switch choice
+    case 1
+        %% AUTO DEMO
+        fprintf('\n🚀 Running automatic demo...\n\n');
+        runAutoPrediction();
+        
+    case 2
+        %% CUSTOM INPUT
+        runCustomInput();
+        
+    case 3
+        %% COMPARE CROPS
+        fprintf('\n📊 Comparing water needs across crops...\n\n');
+        compareCropWaterNeeds();
+        
+    case 4
+        %% DROUGHT SCENARIO
+        fprintf('\n🌵 Analyzing drought scenario...\n\n');
+        analyzeDroughtScenario();
+end
+
+fprintf('\n✅ Demo complete!\n\n');
+
+%% ========================================================================
+%  LOCAL FUNCTIONS
+% =========================================================================
+
+function runAutoPrediction()
+    % Run automatic demo with sample data
+    conditions = struct();
+    conditions.cropType = 'Cotton';
+    conditions.growthStage = 'Mid-season';
+    conditions.plantingDate = datetime('2025-06-15');
+    conditions.daysAfterPlanting = 45;
+    conditions.soilType = 'Loamy';
+    conditions.soilMoisture = 22;
+    conditions.fieldCapacity = 35;
+    conditions.wiltingPoint = 15;
+    conditions.temperature = 28;
+    conditions.humidity = 65;
+    conditions.rainfall_last7days = 0;
+    conditions.rainfall_forecast = [0, 0, 0, 0, 0, 0, 0];
+    conditions.windSpeed = 2.5;
+    conditions.solarRadiation = 22.0;
+    conditions.ndvi = 0.68;
+    conditions.cropHeight = 45;
+    conditions.latitude = 18.5204;
+    conditions.longitude = 73.8567;
+    
+    % Get crop database
+    cropDB = createCropDatabase();
+    
+    % Calculate requirements
+    plan = calculateWaterRequirements(cropDB, conditions);
+    forecast = predictWeeklyWater(plan, conditions);
+    
+    % Display results
+    displayResults(plan, forecast, conditions);
+    
+    % Create visualization
+    createWaterViz(plan, forecast, conditions);
+end
+
+function runCustomInput()
+    fprintf('\n📝 Enter your field data:\n\n');
+    
+    % Get user inputs
+    fprintf('Available crops:\n');
+    fprintf('1=Rice, 2=Wheat, 3=Cotton, 4=Sugarcane, 5=Corn\n');
+    fprintf('6=Tomato, 7=Potato, 8=Soybean, 9=Groundnut, 10=Millet\n');
+    cropChoice = input('Select crop (1-10): ');
+    
+    cropNames = {'Rice', 'Wheat', 'Cotton', 'Sugarcane', 'Corn', ...
+                 'Tomato', 'Potato', 'Soybean', 'Groundnut', 'Millet'};
+    
+    if isempty(cropChoice) || cropChoice < 1 || cropChoice > 10
+        cropChoice = 3;
+        fprintf('Invalid choice. Using Cotton.\n');
+    end
+    
+    fprintf('\nGrowth stages:\n');
+    fprintf('1=Initial, 2=Development, 3=Mid-season, 4=Late-season\n');
+    stageChoice = input('Select growth stage (1-4): ');
+    stageNames = {'Initial', 'Development', 'Mid-season', 'Late-season'};
+    
+    if isempty(stageChoice) || stageChoice < 1 || stageChoice > 4
+        stageChoice = 3;
+        fprintf('Invalid choice. Using Mid-season.\n');
+    end
+    
+    soilMoisture = input('\nCurrent soil moisture (%%): ');
+    if isempty(soilMoisture), soilMoisture = 25; end
+    
+    temperature = input('Current temperature (°C): ');
+    if isempty(temperature), temperature = 28; end
+    
+    humidity = input('Current humidity (%%): ');
+    if isempty(humidity), humidity = 65; end
+    
+    % Run custom prediction
+    conditions = struct();
+    conditions.cropType = cropNames{cropChoice};
+    conditions.growthStage = stageNames{stageChoice};
+    conditions.plantingDate = datetime('2025-06-15');
+    conditions.daysAfterPlanting = days(datetime('now') - conditions.plantingDate);
+    conditions.soilType = 'Loamy';
+    conditions.soilMoisture = soilMoisture;
+    conditions.fieldCapacity = 35;
+    conditions.wiltingPoint = 15;
+    conditions.temperature = temperature;
+    conditions.humidity = humidity;
+    conditions.rainfall_last7days = 0;
+    conditions.rainfall_forecast = [0, 0, 0, 0, 0, 0, 0];
+    conditions.windSpeed = 2.0;
+    conditions.solarRadiation = 20.0;
+    conditions.ndvi = 0.65;
+    conditions.cropHeight = 40;
+    conditions.latitude = 18.5204;
+    conditions.longitude = 73.8567;
+    
+    cropDB = createCropDatabase();
+    plan = calculateWaterRequirements(cropDB, conditions);
+    forecast = predictWeeklyWater(plan, conditions);
+    
+    displayResults(plan, forecast, conditions);
+    createWaterViz(plan, forecast, conditions);
+end
+
+function displayResults(plan, forecast, conditions)
+    fprintf('\n🔄 Processing inputs...\n\n');
+    fprintf('═══════════════════════════════════════\n');
+    fprintf('💧 WATER PREDICTION RESULTS\n');
+    fprintf('═══════════════════════════════════════\n\n');
+    fprintf('🌾 Crop Information:\n');
+    fprintf('   Crop: %s\n', conditions.cropType);
+    fprintf('   Growth Stage: %s\n', conditions.growthStage);
+    fprintf('   Days After Planting: %d\n\n', conditions.daysAfterPlanting);
+    
+    fprintf('🏜️ Current Conditions:\n');
+    fprintf('   Soil Moisture: %.1f%% (FC: %.0f%%, WP: %.0f%%)\n', ...
+            conditions.soilMoisture, conditions.fieldCapacity, conditions.wiltingPoint);
+    fprintf('   Temperature: %.1f°C\n', conditions.temperature);
+    fprintf('   Humidity: %.1f%%\n', conditions.humidity);
+    fprintf('   Moisture Ratio: %.1f%%\n\n', plan.moistureRatio * 100);
+    
+    fprintf('💧 Water Requirements:\n');
+    fprintf('   Daily Need: %.2f mm/day\n', plan.dailyWaterNeed_mm);
+    fprintf('   Per Square Meter: %.2f L/m²\n', plan.dailyWaterNeed_Lm2);
+    fprintf('   Total (1 hectare): %.2f m³\n', plan.dailyWaterNeed_totalm3);
+    fprintf('   Weekly Total: %.1f mm (%.1f m³/ha)\n\n', ...
+            forecast.totalWeeklyNeed, forecast.totalWeeklyNeed * 10);
+    
+    fprintf('⏱️ Irrigation Schedule:\n');
+    fprintf('   Duration: %.1f hours/day\n', plan.irrigationDuration_hours);
+    fprintf('   Frequency: Daily for next 7 days\n\n');
+    
+    fprintf('⚠️ Urgency Level:\n');
+    fprintf('   Status: %s\n', plan.urgency);
+    
+    if plan.moistureRatio < 0.4
+        fprintf('   ⚠️ CRITICAL: Irrigate immediately!\n');
+        fprintf('   Crop is experiencing severe water stress.\n');
+    elseif plan.moistureRatio < 0.6
+        fprintf('   ⚠️ URGENT: Irrigate within next 12 hours.\n');
+        fprintf('   Crop stress developing.\n');
+    elseif plan.moistureRatio < 0.8
+        fprintf('   ✅ SCHEDULED: Irrigate within 24 hours.\n');
+        fprintf('   Moisture adequate but declining.\n');
+    else
+        fprintf('   ✅ GOOD: Monitor daily, irrigate in 1-2 days.\n');
+        fprintf('   Moisture levels optimal.\n');
+    end
+    
+    fprintf('\n📊 Calculation Factors:\n');
+    fprintf('   Evapotranspiration (ET₀): %.2f mm/day\n', plan.ET0);
+    fprintf('   Crop Coefficient (Kc): %.2f\n', plan.Kc);
+    fprintf('   Crop ET (ETc): %.2f mm/day\n', plan.ETc);
+    fprintf('   Stress Factor: %.2f\n', plan.stressFactor);
+    fprintf('   Health Factor: %.2f\n\n', plan.healthFactor);
+    
+    fprintf('═══════════════════════════════════════\n\n');
+end
+
+function compareCropWaterNeeds()
+    cropDB = createCropDatabase();
+    
+    % Standard conditions
+    baseConditions = struct();
+    baseConditions.growthStage = 'Mid-season';
+    baseConditions.soilMoisture = 25;
+    baseConditions.fieldCapacity = 35;
+    baseConditions.wiltingPoint = 15;
+    baseConditions.temperature = 28;
+    baseConditions.humidity = 65;
+    baseConditions.rainfall_last7days = 0;
+    baseConditions.rainfall_forecast = zeros(1,7);
+    baseConditions.windSpeed = 2.0;
+    baseConditions.solarRadiation = 22.0;
+    baseConditions.ndvi = 0.65;
+    baseConditions.cropHeight = 40;
+    baseConditions.latitude = 18.5204;
+    baseConditions.longitude = 73.8567;
+    baseConditions.plantingDate = datetime('2025-06-15');
+    baseConditions.daysAfterPlanting = 50;
+    baseConditions.soilType = 'Loamy';
+    
+    crops = cropDB.Crop;
+    waterNeeds = zeros(length(crops), 1);
+    
+    fprintf('Calculating water needs for all crops...\n\n');
+    
+    for i = 1:length(crops)
+        baseConditions.cropType = crops{i};
+        plan = calculateWaterRequirements(cropDB, baseConditions);
+        waterNeeds(i) = plan.dailyWaterNeed_mm;
+        fprintf('  %s: %.2f mm/day\n', crops{i}, waterNeeds(i));
+    end
+    
+    % Visualize
+    figure('Name', 'Crop Water Comparison', 'Position', [200, 200, 1000, 600]);
+    
+    [sorted, idx] = sort(waterNeeds, 'descend');
+    sortedCrops = crops(idx);
+    
+    colors = zeros(length(sorted), 3);
+    for i = 1:length(sorted)
+        if i == 1
+            colors(i,:) = [1 0.3 0.3];  % Highest in red
+        elseif i == length(sorted)
+            colors(i,:) = [0.2 0.8 0.2];  % Lowest in green
+        else
+            colors(i,:) = [0.3 0.6 1];  % Others in blue
+        end
+    end
+    
+    b = bar(sorted, 'FaceColor', 'flat');
+    b.CData = colors;
+    
+    set(gca, 'XTickLabel', sortedCrops, 'FontWeight', 'bold', 'FontSize', 11);
+    xtickangle(45);
+    ylabel('Water Requirement (mm/day)', 'FontWeight', 'bold', 'FontSize', 12);
+    title('Comparative Water Requirements (Mid-Season, Standard Conditions)', ...
+          'FontWeight', 'bold', 'FontSize', 13);
+    grid on;
+    
+    for i = 1:length(sorted)
+        text(i, sorted(i) + 0.3, sprintf('%.1f', sorted(i)), ...
+            'HorizontalAlignment', 'center', 'FontWeight', 'bold', 'FontSize', 10);
+    end
+    
+    fprintf('\n✅ Comparison complete!\n');
+    fprintf('Key Insights:\n');
+    fprintf('  Highest: %s (%.2f mm/day)\n', sortedCrops{1}, sorted(1));
+    fprintf('  Lowest: %s (%.2f mm/day)\n', sortedCrops{end}, sorted(end));
+    fprintf('  Ratio: %.1fx difference\n\n', sorted(1)/sorted(end));
+end
+
+function analyzeDroughtScenario()
+    fprintf('Simulating 30-day drought scenario for Cotton...\n\n');
+    
+    conditions = struct();
+    conditions.cropType = 'Cotton';
+    conditions.growthStage = 'Mid-season';
+    conditions.soilType = 'Loamy';
+    conditions.fieldCapacity = 35;
+    conditions.wiltingPoint = 15;
+    conditions.temperature = 32;
+    conditions.humidity = 45;
+    conditions.windSpeed = 3.5;
+    conditions.solarRadiation = 25;
+    conditions.ndvi = 0.70;
+    conditions.cropHeight = 50;
+    conditions.latitude = 18.5204;
+    conditions.longitude = 73.8567;
+    conditions.plantingDate = datetime('2025-06-01');
+    conditions.daysAfterPlanting = 60;
+    conditions.rainfall_last7days = 0;
+    conditions.rainfall_forecast = zeros(1,7);
+    
+    cropDB = createCropDatabase();
+    
+    days = 30;
+    soilMoisture = zeros(days, 1);
+    waterNeeds = zeros(days, 1);
+    ndviValues = zeros(days, 1);
+    
+    currentMoisture = 30;
+    currentNDVI = 0.70;
+    
+    for d = 1:days
+        conditions.soilMoisture = currentMoisture;
+        conditions.ndvi = currentNDVI;
+        
+        plan = calculateWaterRequirements(cropDB, conditions);
+        
+        soilMoisture(d) = currentMoisture;
+        waterNeeds(d) = plan.dailyWaterNeed_mm;
+        ndviValues(d) = currentNDVI;
+        
+        moistureLoss = plan.ETc / 10;
+        currentMoisture = max(conditions.wiltingPoint, currentMoisture - moistureLoss);
+        
+        if currentMoisture < 20
+            currentNDVI = max(0.2, currentNDVI - 0.01);
+        elseif currentMoisture < 25
+            currentNDVI = max(0.3, currentNDVI - 0.005);
+        end
+    end
+    
+    % Visualize
+    figure('Name', 'Drought Scenario Analysis', 'Position', [100, 100, 1200, 700]);
+    
+    subplot(2, 2, 1);
+    plot(1:days, soilMoisture, '-b', 'LineWidth', 2.5);
+    hold on;
+    yline(15, '--r', 'Wilting Point', 'LineWidth', 2);
+    yline(25, '--', 'Color', [1 0.6 0], 'LineWidth', 2);
+    text(5, 26, 'Stress Threshold', 'FontSize', 9, 'Color', [1 0.6 0]);
+    xlabel('Days', 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('Soil Moisture (%)', 'FontWeight', 'bold', 'FontSize', 11);
+    title('Soil Moisture Depletion', 'FontSize', 13, 'FontWeight', 'bold');
+    grid on;
+    xlim([1 30]);
+    
+    subplot(2, 2, 2);
+    plot(1:days, ndviValues, '-g', 'LineWidth', 2.5);
+    hold on;
+    yline(0.5, '--r', 'Stress Threshold', 'LineWidth', 2);
+    xlabel('Days', 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('NDVI', 'FontWeight', 'bold', 'FontSize', 11);
+    title('Crop Health Decline', 'FontSize', 13, 'FontWeight', 'bold');
+    grid on;
+    xlim([1 30]);
+    
+    subplot(2, 2, 3);
+    area(1:days, waterNeeds, 'FaceColor', [0.4 0.7 1], 'EdgeColor', 'b', 'LineWidth', 1.5);
+    xlabel('Days', 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('Water Need (mm/day)', 'FontWeight', 'bold', 'FontSize', 11);
+    title('Increasing Water Demand', 'FontSize', 13, 'FontWeight', 'bold');
+    grid on;
+    xlim([1 30]);
+    
+    subplot(2, 2, 4);
+    cumWater = cumsum(waterNeeds);
+    plot(1:days, cumWater, '-r', 'LineWidth', 2.5);
+    xlabel('Days', 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('Cumulative Water (mm)', 'FontWeight', 'bold', 'FontSize', 11);
+    title(sprintf('Total Water Deficit: %.1f mm', cumWater(end)), ...
+          'FontSize', 13, 'FontWeight', 'bold');
+    grid on;
+    xlim([1 30]);
+    
+    sgtitle('🌵 30-Day Drought Impact Analysis - Cotton', 'FontSize', 16, 'FontWeight', 'bold');
+    
+    wiltDay = find(soilMoisture <= 15, 1);
+    stressDay = find(ndviValues < 0.5, 1);
+    
+    fprintf('═══════════════════════════════════════\n');
+    fprintf('DROUGHT IMPACT SUMMARY\n');
+    fprintf('═══════════════════════════════════════\n\n');
+    fprintf('Critical Milestones:\n');
+    if ~isempty(wiltDay)
+        fprintf('  Day %d: Soil moisture reaches wilting point (%.1f%%)\n', wiltDay, soilMoisture(wiltDay));
+    else
+        fprintf('  Wilting point not reached in 30 days\n');
+    end
+    if ~isempty(stressDay)
+        fprintf('  Day %d: NDVI drops below stress threshold (%.2f)\n', stressDay, ndviValues(stressDay));
+    else
+        fprintf('  NDVI stress threshold not reached\n');
+    end
+    fprintf('\nWater Balance:\n');
+    fprintf('  Total water deficit: %.1f mm\n', cumWater(end));
+    fprintf('  Equivalent volume: %.1f m³/hectare\n', cumWater(end)*10);
+    fprintf('  Average daily need: %.2f mm\n', mean(waterNeeds));
+    fprintf('\nCrop Health:\n');
+    fprintf('  Initial NDVI: %.2f\n', ndviValues(1));
+    fprintf('  Final NDVI: %.2f\n', ndviValues(end));
+    fprintf('  Health decline: %.1f%%\n', (1 - ndviValues(end)/ndviValues(1))*100);
+    fprintf('\n═══════════════════════════════════════\n\n');
+end
+
+function createWaterViz(plan, forecast, conditions)
+    figure('Name', 'Water Prediction Results', 'Position', [200, 200, 1200, 500]);
+    
+    % Left plot: 7-day forecast
+    subplot(1, 2, 1);
+    yyaxis left
+    bar(forecast.days, forecast.dailyNeeds, 'FaceColor', [0.3 0.6 1]);
+    ylabel('Water Need (mm/day)', 'FontWeight', 'bold', 'FontSize', 11);
+    ylim([0 max(forecast.dailyNeeds) * 1.3]);
+    
+    yyaxis right
+    plot(forecast.days, forecast.soilMoisture, '-ro', 'LineWidth', 2.5, 'MarkerSize', 8);
+    hold on;
+    yline(conditions.wiltingPoint, '--r', 'Wilting', 'LineWidth', 1.5);
+    yline(conditions.fieldCapacity, '--g', 'Capacity', 'LineWidth', 1.5);
+    ylabel('Soil Moisture (%)', 'FontWeight', 'bold', 'FontSize', 11);
+    ylim([conditions.wiltingPoint - 5, conditions.fieldCapacity + 5]);
+    
+    xlabel('Day', 'FontWeight', 'bold', 'FontSize', 11);
+    title('7-Day Water Forecast', 'FontWeight', 'bold', 'FontSize', 13);
+    legend('Daily Need', 'Soil Moisture', 'Location', 'best');
+    grid on;
+    
+    % Right plot: Before/After irrigation
+    subplot(1, 2, 2);
+    categories = {'Current\nMoisture', 'After\nIrrigation'};
+    afterIrrigation = min(conditions.fieldCapacity, ...
+                          conditions.soilMoisture + plan.dailyWaterNeed_mm/10);
+    values = [conditions.soilMoisture, afterIrrigation];
+    
+    colors = [0.2 0.7 0.9; 0.2 0.8 0.3];
+    b = bar(values, 'FaceColor', 'flat');
+    b.CData = colors;
+    
+    hold on;
+    yline(conditions.wiltingPoint, '--r', 'Wilting Point', 'LineWidth', 2);
+    yline(conditions.fieldCapacity, '--g', 'Field Capacity', 'LineWidth', 2);
+    
+    set(gca, 'XTickLabel', categories, 'FontWeight', 'bold', 'FontSize', 11);
+    ylabel('Soil Moisture (%)', 'FontWeight', 'bold', 'FontSize', 11);
+    title('Irrigation Impact', 'FontWeight', 'bold', 'FontSize', 13);
+    ylim([0 max(values) + 10]);
+    grid on;
+    
+    % Add value labels
+    for i = 1:2
+        text(i, values(i) + 1, sprintf('%.1f%%', values(i)), ...
+            'HorizontalAlignment', 'center', 'FontWeight', 'bold', 'FontSize', 11);
+    end
+    
+    sgtitle(sprintf('💧 Water Prediction: %s (%s)', conditions.cropType, conditions.growthStage), ...
+            'FontSize', 15, 'FontWeight', 'bold');
+end
+
+function db = createCropDatabase()
+    cropNames = {'Rice', 'Wheat', 'Cotton', 'Sugarcane', 'Corn', ...
+                 'Tomato', 'Potato', 'Soybean', 'Groundnut', 'Millet'};
+    waterNeeds = [7.5, 8.5, 9.0, 6.0; 3.0, 4.5, 6.0, 3.5; 4.0, 5.5, 7.5, 5.0; ...
+                  5.0, 7.0, 9.5, 7.0; 3.5, 5.0, 7.0, 4.5; 3.0, 4.5, 6.5, 4.0; ...
+                  3.5, 5.0, 6.0, 4.0; 3.0, 4.5, 6.5, 4.0; 3.5, 5.0, 6.0, 3.5; ...
+                  2.5, 3.5, 5.0, 3.0];
+    kc_values = [1.05, 1.10, 1.20, 0.90; 0.30, 0.70, 1.15, 0.40; ...
+                 0.35, 0.70, 1.15, 0.70; 0.40, 0.75, 1.25, 0.75; ...
+                 0.30, 0.80, 1.20, 0.60; 0.45, 0.75, 1.15, 0.80; ...
+                 0.45, 0.75, 1.15, 0.75; 0.35, 0.75, 1.15, 0.50; ...
+                 0.40, 0.70, 1.05, 0.60; 0.30, 0.70, 1.05, 0.55];
+    rootDepth = [30, 100, 100, 150, 100, 60, 50, 80, 60, 120]';
+    droughtTolerance = [1, 3, 3, 2, 3, 2, 2, 3, 3, 5]';
+    
+    db = table(cropNames', waterNeeds, kc_values, rootDepth, droughtTolerance, ...
+        'VariableNames', {'Crop', 'WaterNeeds_mmday', 'Kc', 'RootDepth_cm', 'DroughtTolerance'});
+end
+
+function plan = calculateWaterRequirements(cropDB, conditions)
+    cropIdx = find(strcmp(cropDB.Crop, conditions.cropType));
+    cropData = cropDB(cropIdx, :);
+    
+    stageNames = {'Initial', 'Development', 'Mid-season', 'Late-season'};
+    stageIdx = find(strcmp(stageNames, conditions.growthStage));
+    
+    baseWaterNeed = cropData.WaterNeeds_mmday(stageIdx);
+    ET0 = 0.0135 * conditions.temperature * 20;
+    Kc = cropData.Kc(stageIdx);
+    ETc = Kc * ET0;
+    
+    availableWater = conditions.soilMoisture - conditions.wiltingPoint;
+    maxAvailableWater = conditions.fieldCapacity - conditions.wiltingPoint;
+    moistureRatio = availableWater / maxAvailableWater;
+    
+    stressFactor = 1.0 + max(0, 1 - moistureRatio) * 0.5;
+    healthFactor = 1.0 + max(0, 0.7 - conditions.ndvi) * 0.3;
+    
+    dailyWaterNeed = baseWaterNeed * stressFactor * healthFactor;
+    
+    plan.dailyWaterNeed_mm = dailyWaterNeed;
+    plan.dailyWaterNeed_Lm2 = dailyWaterNeed;
+    plan.dailyWaterNeed_totalm3 = dailyWaterNeed * 10;
+    plan.irrigationDuration_hours = dailyWaterNeed / 4;
+    plan.ET0 = ET0;
+    plan.ETc = ETc;
+    plan.Kc = Kc;
+    plan.stressFactor = stressFactor;
+    plan.healthFactor = healthFactor;
+    plan.moistureRatio = moistureRatio;
+    
+    if moistureRatio < 0.4
+        plan.urgency = 'CRITICAL - Irrigate Immediately';
+    elseif moistureRatio < 0.6
+        plan.urgency = 'URGENT - Irrigate Today';
+    elseif moistureRatio < 0.8
+        plan.urgency = 'SCHEDULED - Within 24h';
+    else
+        plan.urgency = 'ADEQUATE - Monitor';
+    end
+end
+
+function forecast = predictWeeklyWater(plan, conditions)
+    forecast.days = 1:7;
+    forecast.dailyNeeds = repmat(plan.dailyWaterNeed_mm, 7, 1);
+    
+    currentMoisture = conditions.soilMoisture;
+    moistureValues = zeros(7, 1);
+    
+    for d = 1:7
+        moistureIncrease = plan.dailyWaterNeed_mm / 10;
+        moistureLoss = plan.ETc / 10;
+        currentMoisture = currentMoisture + moistureIncrease - moistureLoss;
+        currentMoisture = min(conditions.fieldCapacity, max(conditions.wiltingPoint, currentMoisture));
+        moistureValues(d) = currentMoisture;
+    end
+    
+    forecast.soilMoisture = moistureValues;
+    forecast.rainfall = conditions.rainfall_forecast;
+    forecast.totalWeeklyNeed = sum(forecast.dailyNeeds);
+    forecast.cumulativeWater = cumsum(forecast.dailyNeeds);
+end

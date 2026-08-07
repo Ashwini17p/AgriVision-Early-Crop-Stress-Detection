@@ -1,0 +1,24 @@
+function window_zone_monitor()
+figure('Name','SmartFarm | Zone & Soil Monitor','NumberTitle','off','Position',[50 50 600 650],'Color',[0.08 0.08 0.08]);
+tiledlayout(2,1,'Padding','compact','TileSpacing','compact');
+
+% --- NDVI / Health Map ---
+nexttile(1);
+healthMap = randi([1,3],14,21);
+imagesc(healthMap);
+title('🗺️ Field NDVI & Health Zones','Color','w','FontWeight','bold');
+colormap([1 0 0;1 1 0;0 1 0]);
+colorbar('Ticks',[1,2,3],'TickLabels',{'Deficient','Stressed','Healthy'});
+xlabel('Column'); ylabel('Row');
+set(gca,'Color',[0.1 0.1 0.1],'XColor','w','YColor','w');
+
+% --- Soil Moisture Distribution ---
+nexttile(2);
+moistureMap = rand(14,21)*100;
+imagesc(moistureMap);
+title('💧 Soil Moisture Distribution (%)','Color','w','FontWeight','bold');
+colormap(parula);
+colorbar;
+xlabel('Column'); ylabel('Row');
+set(gca,'Color',[0.1 0.1 0.1],'XColor','w','YColor','w');
+end

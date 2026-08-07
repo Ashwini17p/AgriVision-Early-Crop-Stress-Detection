@@ -1,0 +1,25 @@
+function thingspeak_demo()
+disp("📡 Uploading data to ThingSpeak...");
+
+channelID   = 3093053;
+writeAPIKey = '5C1QEDWVLCAP43NC';
+
+nd     = readtable('data/processed/ndvi_by_zone.csv');
+sensor = readtable('data/sensor_data.csv');
+
+avgNDVI  = mean(nd.avgNDVI);
+avgMoist = mean(sensor.soil_moisture);
+
+try
+    thingSpeakWrite(channelID,[avgMoist,avgNDVI],'WriteKey',writeAPIKey, ...
+                'Fields',[1,4]);   % field 1 = moisture, field 4 = NDVI
+
+    disp("✅ Uploaded average NDVI + Moisture to ThingSpeak");
+catch ME
+    warning('%s',"⚠️ ThingSpeak write failed: "+ME.message);
+end
+
+disp("🌾 Upload complete — check ThingSpeak charts for live updates.");
+end
+
+
